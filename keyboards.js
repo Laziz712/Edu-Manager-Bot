@@ -13,11 +13,11 @@ function mainMenu(admin) {
   const buttons = [
     ['📚 Kurslar', "👨‍🏫 O'qituvchilar"],
     ['📰 Yangiliklar', '📖 Mening darslarim'],
-    ["💳 To'lovlar", '📊 Baholarim'],
+    ['💳 To'lovlar', '📊 Baholarim'],
   ];
   if (admin) buttons.push(['⚙️ Admin panel']);
   buttons.push(['🌐 Web App', '❓ Yordam']);
-  return Markup.keyboard(buttons).resize();
+  return Markup.keyboard(buttons).resize().oneTime(false);
 }
 
 // ========== ADMIN MENU ==========
@@ -25,35 +25,35 @@ const adminMenu = Markup.keyboard([
   ["➕ Kurs qo'shish", "➕ O'qituvchi qo'shish"],
   ["➕ O'quvchi qo'shish", '📢 Yangilik yuborish'],
   ['📊 Statistika', '✅ Davomat olish'],
-  ["✏️ Baho qo'yish", '🗓 Dars jadvali'],
-  ["💰 To'lovlar", "📋 Barcha o'quvchilar"],
+  ['✏️ Baho qo'yish', '🗓 Dars jadvali'],
+  ['💰 To'lovlar', '📋 Barcha o'quvchilar'],
   ['⬅️ Orqaga'],
-]).resize();
+]).resize().oneTime(false);
 
 // ========== CANCEL KEYBOARD ==========
-const cancelKeyboard = Markup.keyboard([['❌ Bekor qilish']]).resize();
+const cancelKeyboard = Markup.keyboard([['❌ Bekor qilish']]).resize().oneTime(false);
 
 // ========== BACK KEYBOARD ==========
-const backKeyboard = Markup.keyboard([['⬅️ Orqaga']]).resize();
+const backKeyboard = Markup.keyboard([['⬅️ Orqaga']]).resize().oneTime(false);
 
 // ========== CONFIRM KEYBOARD ==========
 const confirmKeyboard = Markup.keyboard([
   ['✅ Tasdiqlash'],
   ['❌ Bekor qilish']
-]).resize();
+]).resize().oneTime(false);
 
 // ========== ATTENDANCE STATUS ==========
 const attendanceKeyboard = Markup.keyboard([
   ['✅ Keldi', '❌ Kelmadi'],
-  ['📝 Kechikdi', "🏥 Sog'liq sababli"],
+  ['📝 Kechikdi', '🏥 Sog'liq sababli'],
   ['⬅️ Orqaga']
-]).resize();
+]).resize().oneTime(false);
 
 // ========== GRADE KEYBOARD ==========
 const gradeKeyboard = Markup.keyboard([
   ['5', '4', '3', '2'],
   ['⬅️ Orqaga']
-]).resize();
+]).resize().oneTime(false);
 
 module.exports = {
   isAdmin,

@@ -1,9 +1,9 @@
 const { Scenes, Markup } = require('telegraf');
 const { readDB, writeDB } = require('./db');
-const { adminMenu, cancelKeyboard, backKeyboard, confirmKeyboard, attendanceKeyboard, gradeKeyboard } = require('./keyboards');
+const { adminMenu, cancelKeyboard } = require('./keyboards');
 
 async function cancelScene(ctx) {
-  await ctx.reply('❌ Bekor qilindi.', adminMenu);
+  await ctx.replyWithMarkdown('❌ Bekor qilindi.', adminMenu);
   return ctx.scene.leave();
 }
 
@@ -11,15 +11,11 @@ function isCancel(ctx) {
   return ctx.message && ctx.message.text === '❌ Bekor qilish';
 }
 
-function isBack(ctx) {
-  return ctx.message && ctx.message.text === '⬅️ Orqaga';
-}
-
 // ========== ADD COURSE SCENE ==========
 const addCourseScene = new Scenes.WizardScene(
   'ADD_COURSE',
   async (ctx) => {
-    await ctx.reply("📖 *Kurs qo'shish*\n\nKurs nomini kiriting:", { parse_mode: 'Markdown', ...cancelKeyboard });
+    await ctx.replyWithMarkdown("📖 *Kurs qo'shish*\n\nKurs nomini kiriting:", cancelKeyboard);
     return ctx.wizard.next();
   },
   async (ctx) => {
@@ -51,13 +47,16 @@ const addCourseScene = new Scenes.WizardScene(
 
     const db = readDB();
     if (db.teachers.length === 0) {
-      await ctx.reply("⚠️ Avval kamida bitta o'qituvchi qo'shing.", adminMenu);
+      await ctx.replyWithMarkdown("⚠️ Avval kamida bitta o'qituvchi qo'shing.", adminMenu);
       return ctx.scene.leave();
     }
     const buttons = db.teachers.map((t) => [
-      Markup.button.callback(`${t.name} (${t.subject})`, `pick_teacher_${t.id}`),
+      Markup.button.callback(t.name, `pick_teacher_${t.id}`),
     ]);
-    await ctx.reply("👨‍🏫 Kurs uchun o'qituvchini tanlang:", Markup.inlineKeyboard(buttons));
+    await ctx.replyWithMarkdown(
+      "👨‍🏫 Kurs uchun o'qituvchini tanlang:",
+      Markup.inlineKeyboard(buttons)
+    );
     return ctx.wizard.next();
   },
   async (ctx) => {
@@ -83,9 +82,9 @@ addCourseScene.action(/pick_teacher_(.+)/, async (ctx) => {
   db.courses.push(newCourse);
   writeDB(db);
   await ctx.answerCbQuery('✅ Saqlandi');
-  await ctx.reply(
+  await ctx.replyWithMarkdown(
     `✅ *"${newCourse.name}"* kursi muvaffaqiyatli qo'shildi!\n\n📝 ${newCourse.description}\n💰 Narxi: ${newCourse.price.toLocaleString()} so'm\n📅 Davomiyligi: ${newCourse.duration}\n👨‍🏫 O'qituvchi: ${db.teachers.find(t => String(t.id) === String(teacherId))?.name || "Noma'lum"}`,
-    { parse_mode: 'Markdown', ...adminMenu }
+    adminMenu
   );
   return ctx.scene.leave();
 });
@@ -94,7 +93,7 @@ addCourseScene.action(/pick_teacher_(.+)/, async (ctx) => {
 const addTeacherScene = new Scenes.WizardScene(
   'ADD_TEACHER',
   async (ctx) => {
-    await ctx.reply("👨‍🏫 *O'qituvchi qo'shish*\n\nF.I.Sh kiriting:", { parse_mode: 'Markdown', ...cancelKeyboard });
+    await ctx.replyWithMarkdown("👨‍🏫 *O'qituvchi qo'shish*\n\nF.I.Sh kiriting:", cancelKeyboard);
     return ctx.wizard.next();
   },
   async (ctx) => {
@@ -112,7 +111,7 @@ const addTeacherScene = new Scenes.WizardScene(
   async (ctx) => {
     if (isCancel(ctx)) return cancelScene(ctx);
     ctx.wizard.state.teacher.phone = ctx.message.text;
-    await ctx.reply("📧 Email manzilini kiriting (yo'q bo'lsa \"yo'q\" deb yozing):");
+    await ctx.reply('📧 Email manzilini kiriting (yo\'q bo\'lsa "yo\'q" deb yozing):');
     return ctx.wizard.next();
   },
   async (ctx) => {
@@ -128,9 +127,9 @@ const addTeacherScene = new Scenes.WizardScene(
     };
     db.teachers.push(newTeacher);
     writeDB(db);
-    await ctx.reply(
+    await ctx.replyWithMarkdown(
       `✅ *O'qituvchi qo'shildi!*\n\n👤 ${newTeacher.name}\n📚 ${newTeacher.subject}\n📞 ${newTeacher.phone}${newTeacher.email ? '\n📧 ' + newTeacher.email : ''}`,
-      { parse_mode: 'Markdown', ...adminMenu }
+      adminMenu
     );
     return ctx.scene.leave();
   }
@@ -140,7 +139,7 @@ const addTeacherScene = new Scenes.WizardScene(
 const addStudentScene = new Scenes.WizardScene(
   'ADD_STUDENT',
   async (ctx) => {
-    await ctx.reply("👤 *O'quvchi qo'shish*\n\nF.I.Sh kiriting:", { parse_mode: 'Markdown', ...cancelKeyboard });
+    await ctx.replyWithMarkdown("👤 *O'quvchi qo'shish*\n\nF.I.Sh kiriting:", cancelKeyboard);
     return ctx.wizard.next();
   },
   async (ctx) => {
@@ -152,7 +151,7 @@ const addStudentScene = new Scenes.WizardScene(
   async (ctx) => {
     if (isCancel(ctx)) return cancelScene(ctx);
     ctx.wizard.state.student.phone = ctx.message.text;
-    await ctx.reply("📧 Email manzilini kiriting (yo'q bo'lsa \"yo'q\" deb yozing):");
+    await ctx.reply('📧 Email manzilini kiriting (yo\'q bo\'lsa "yo\'q" deb yozing):');
     return ctx.wizard.next();
   },
   async (ctx) => {
@@ -170,9 +169,9 @@ const addStudentScene = new Scenes.WizardScene(
     };
     db.students.push(newStudent);
     writeDB(db);
-    await ctx.reply(
+    await ctx.replyWithMarkdown(
       `✅ *O'quvchi qo'shildi!*\n\n👤 ${newStudent.name}\n📞 ${newStudent.phone}${newStudent.email ? '\n📧 ' + newStudent.email : ''}`,
-      { parse_mode: 'Markdown', ...adminMenu }
+      adminMenu
     );
     return ctx.scene.leave();
   }
@@ -182,7 +181,7 @@ const addStudentScene = new Scenes.WizardScene(
 const sendNewsScene = new Scenes.WizardScene(
   'SEND_NEWS',
   async (ctx) => {
-    await ctx.reply('📢 *Yangilik yuborish*\n\nYangilik matnini kiriting:', { parse_mode: 'Markdown', ...cancelKeyboard });
+    await ctx.replyWithMarkdown('📢 *Yangilik yuborish*\n\nYangilik matnini kiriting:', cancelKeyboard);
     return ctx.wizard.next();
   },
   async (ctx) => {
@@ -208,9 +207,9 @@ const sendNewsScene = new Scenes.WizardScene(
         }
       }
     }
-    await ctx.reply(
+    await ctx.replyWithMarkdown(
       `✅ *Yangilik yuborildi!*\n\n📤 Yuborildi: ${sent} ta\n❌ Yuborilmadi: ${failed} ta`,
-      { parse_mode: 'Markdown', ...adminMenu }
+      adminMenu
     );
     return ctx.scene.leave();
   }
@@ -222,13 +221,16 @@ const addGradeScene = new Scenes.WizardScene(
   async (ctx) => {
     const db = readDB();
     if (db.students.length === 0) {
-      await ctx.reply("📭 Avval o'quvchi qo'shing.", adminMenu);
+      await ctx.replyWithMarkdown('📭 Avval o\'quvchi qo\'shing.', adminMenu);
       return ctx.scene.leave();
     }
     const buttons = db.students.map((s) => [
       Markup.button.callback(s.name, `grade_student_${s.id}`),
     ]);
-    await ctx.reply("👤 *Baho qo'yish*\n\nO'quvchini tanlang:", { parse_mode: 'Markdown', ...Markup.inlineKeyboard(buttons) });
+    await ctx.replyWithMarkdown(
+      "👤 *Baho qo'yish*\n\nO'quvchini tanlang:",
+      Markup.inlineKeyboard(buttons)
+    );
     return ctx.wizard.next();
   },
   async (ctx) => {
@@ -258,7 +260,7 @@ addGradeScene.on('text', async (ctx) => {
   if (isCancel(ctx)) return cancelScene(ctx);
   const grade = Number(ctx.message.text);
   if (isNaN(grade) || grade < 2 || grade > 5) {
-    await ctx.reply("❌ Baho 2 dan 5 gacha bo'lishi kerak!");
+    await ctx.reply('❌ Baho 2 dan 5 gacha bo\'lishi kerak!');
     return;
   }
   const db = readDB();
@@ -275,9 +277,9 @@ addGradeScene.on('text', async (ctx) => {
 
   const student = db.students.find(s => s.id === studentId);
   const course = db.courses.find(c => String(c.id) === String(courseId));
-  await ctx.reply(
-    `✅ *Baho qo'yildi!*\n\n👤 ${student?.name || "Noma'lum"}\n📖 ${course?.name || "Noma'lum"}\n⭐ Baho: ${grade}`,
-    { parse_mode: 'Markdown', ...adminMenu }
+  await ctx.replyWithMarkdown(
+    `✅ *Baho qo'yildi!*\n\n👤 ${student?.name || 'Noma\'lum'}\n📖 ${course?.name || 'Noma\'lum'}\n⭐ Baho: ${grade}`,
+    adminMenu
   );
   return ctx.scene.leave();
 });
@@ -288,13 +290,16 @@ const attendanceScene = new Scenes.WizardScene(
   async (ctx) => {
     const db = readDB();
     if (db.students.length === 0) {
-      await ctx.reply("📭 Avval o'quvchi qo'shing.", adminMenu);
+      await ctx.replyWithMarkdown('📭 Avval o\'quvchi qo\'shing.', adminMenu);
       return ctx.scene.leave();
     }
     const buttons = db.students.map((s) => [
       Markup.button.callback(s.name, `att_student_${s.id}`),
     ]);
-    await ctx.reply("✅ *Davomat olish*\n\nO'quvchini tanlang:", { parse_mode: 'Markdown', ...Markup.inlineKeyboard(buttons) });
+    await ctx.replyWithMarkdown(
+      "✅ *Davomat olish*\n\nO'quvchini tanlang:",
+      Markup.inlineKeyboard(buttons)
+    );
     return ctx.wizard.next();
   },
   async (ctx) => {
@@ -341,9 +346,9 @@ attendanceScene.on('text', async (ctx) => {
   writeDB(db);
 
   const student = db.students.find(s => s.id === studentId);
-  await ctx.reply(
-    `✅ *Davomat saqlandi!*\n\n👤 ${student?.name || "Noma'lum"}\n${statusEmojis[status]} ${statusTexts[status]}\n📅 ${new Date().toLocaleDateString('uz-UZ')}${note ? '\n💬 ' + note : ''}`,
-    { parse_mode: 'Markdown', ...adminMenu }
+  await ctx.replyWithMarkdown(
+    `✅ *Davomat saqlandi!*\n\n👤 ${student?.name || 'Noma\'lum'}\n${statusEmojis[status]} ${statusTexts[status]}\n📅 ${new Date().toLocaleDateString('uz-UZ')}${note ? '\n💬 ' + note : ''}`,
+    adminMenu
   );
   return ctx.scene.leave();
 });
