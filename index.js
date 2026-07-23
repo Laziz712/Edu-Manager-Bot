@@ -1,6 +1,7 @@
 require('dotenv').config();
 const { Telegraf, Scenes, session, Markup } = require('telegraf');
 const { readDB, writeDB } = require('./db');
+const { mainMenu, adminMenu } = require('./keyboards');
 const {
   addCourseScene,
   addTeacherScene,
