@@ -11,6 +11,7 @@ function isCancel(ctx) {
   return ctx.message && ctx.message.text === '❌ Bekor qilish';
 }
 
+// ========== ADD COURSE SCENE ==========
 const addCourseScene = new Scenes.WizardScene(
   'ADD_COURSE',
   async (ctx) => {
@@ -32,8 +33,8 @@ const addCourseScene = new Scenes.WizardScene(
   async (ctx) => {
     if (isCancel(ctx)) return cancelScene(ctx);
     const price = Number(ctx.message.text);
-    if (isNaN(price)) {
-      await ctx.reply('Iltimos faqat raqam kiriting. Masalan: 350000');
+    if (isNaN(price) || price <= 0) {
+      await ctx.reply('❌ Iltimos faqat musbat raqam kiriting. Masalan: 350000');
       return; // shu qadamda qoladi
     }
     ctx.wizard.state.course.price = price;
@@ -41,7 +42,7 @@ const addCourseScene = new Scenes.WizardScene(
     const db = readDB();
     if (db.teachers.length === 0) {
       await ctx.reply(
-        "Avval kamida bitta o'qituvchi qo'shing, keyin kurs qo'shishingiz mumkin.",
+        "⚠️ Avval kamida bitta o'qituvchi qo'shing, keyin kurs qo'shishingiz mumkin.",
         adminMenu
       );
       return ctx.scene.leave();
@@ -56,6 +57,7 @@ const addCourseScene = new Scenes.WizardScene(
     return ctx.wizard.next();
   },
   async (ctx) => {
+    // Bu qadam inline keyboard orqali tugallanadi
     return;
   }
 );
@@ -70,14 +72,19 @@ addCourseScene.action(/pick_teacher_(.+)/, async (ctx) => {
     description: course.description,
     price: course.price,
     teacherId,
+    createdAt: new Date().toISOString(),
   };
   db.courses.push(newCourse);
   writeDB(db);
   await ctx.answerCbQuery('Saqlandi ✅');
-  await ctx.reply(`✅ "${newCourse.name}" kursi muvaffaqiyatli qo'shildi.`, adminMenu);
+  await ctx.reply(
+    `✅ "${newCourse.name}" kursi muvaffaqiyatli qo'shildi.\n\n📋 Tavsif: ${newCourse.description}\n💰 Narx: ${newCourse.price.toLocaleString()} so'm`,
+    adminMenu
+  );
   return ctx.scene.leave();
 });
 
+// ========== ADD TEACHER SCENE ==========
 const addTeacherScene = new Scenes.WizardScene(
   'ADD_TEACHER',
   async (ctx) => {
@@ -100,14 +107,22 @@ const addTeacherScene = new Scenes.WizardScene(
     if (isCancel(ctx)) return cancelScene(ctx);
     ctx.wizard.state.teacher.phone = ctx.message.text;
     const db = readDB();
-    const newTeacher = { id: Date.now(), ...ctx.wizard.state.teacher };
+    const newTeacher = { 
+      id: Date.now(), 
+      ...ctx.wizard.state.teacher,
+      createdAt: new Date().toISOString(),
+    };
     db.teachers.push(newTeacher);
     writeDB(db);
-    await ctx.reply(`✅ O'qituvchi "${newTeacher.name}" qo'shildi.`, adminMenu);
+    await ctx.reply(
+      `✅ O'qituvchi "${newTeacher.name}" qo'shildi.\n\n📚 Fan: ${newTeacher.subject}\n📞 Telefon: ${newTeacher.phone}`,
+      adminMenu
+    );
     return ctx.scene.leave();
   }
 );
 
+// ========== ADD STUDENT SCENE ==========
 const addStudentScene = new Scenes.WizardScene(
   'ADD_STUDENT',
   async (ctx) => {
@@ -132,11 +147,15 @@ const addStudentScene = new Scenes.WizardScene(
     };
     db.students.push(newStudent);
     writeDB(db);
-    await ctx.reply(`✅ O'quvchi "${newStudent.name}" qo'shildi.`, adminMenu);
+    await ctx.reply(
+      `✅ O'quvchi "${newStudent.name}" qo'shildi.\n📞 Telefon: ${newStudent.phone}`,
+      adminMenu
+    );
     return ctx.scene.leave();
   }
 );
 
+// ========== SEND NEWS SCENE ==========
 const sendNewsScene = new Scenes.WizardScene(
   'SEND_NEWS',
   async (ctx) => {
@@ -151,16 +170,25 @@ const sendNewsScene = new Scenes.WizardScene(
     writeDB(db);
 
     let sent = 0;
+    let failed = 0;
     for (const s of db.students) {
       if (s.telegramId) {
         try {
-          await ctx.telegram.sendMessage(s.telegramId, `📰 Yangilik:\n\n${text}`);
+          await ctx.telegram.sendMessage(
+            s.telegramId, 
+            `📰 *YANGILIK*\n\n${text}`,
+            { parse_mode: 'Markdown' }
+          );
           sent++;
         } catch (e) {
+          failed++;
         }
       }
     }
-    await ctx.reply(`✅ Yangilik yuborildi (${sent} ta foydalanuvchiga).`, adminMenu);
+    await ctx.reply(
+      `✅ Yangilik saqlandi va yuborildi!\n\n📤 Yuborildi: ${sent} ta\n❌ Yuborilmadi: ${failed} ta`,
+      adminMenu
+    );
     return ctx.scene.leave();
   }
 );
