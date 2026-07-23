@@ -1,7 +1,7 @@
 {
   "name": "edu-manager-bot",
-  "version": "1.0.0",
-  "description": "Edu Manager - Telegram Bot for Education Management",
+  "version": "2.0.0",
+  "description": "Edu Manager - Education Management Telegram Bot with Mini App",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
@@ -9,7 +9,9 @@
   },
   "dependencies": {
     "telegraf": "^4.16.3",
-    "dotenv": "^16.4.5"
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "cors": "^2.8.5"
   },
   "devDependencies": {
     "nodemon": "^3.1.0"

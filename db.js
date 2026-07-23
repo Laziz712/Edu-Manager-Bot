@@ -11,6 +11,11 @@ function readDB() {
       courses: [],
       news: [],
       enrollments: [],
+      grades: [],
+      attendance: [],
+      schedule: [],
+      payments: [],
+      notifications: [],
     };
     fs.writeFileSync(DB_PATH, JSON.stringify(initial, null, 2));
     return initial;
