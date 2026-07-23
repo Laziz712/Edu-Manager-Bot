@@ -9,12 +9,12 @@ const {
   sendNewsScene,
 } = require('./scenes');
 
-if (!process.env.BOT_TOKEN) {
-  console.error("❌ .env faylida BOT_TOKEN ko'rsatilmagan!");
+if (!process.env.BOT_TOKENS) {
+  console.error("❌ .env faylida BOT_TOKENS ko'rsatilmagan!");
   process.exit(1);
 }
 
-const bot = new Telegraf(process.env.BOT_TOKEN);
+const bot = new Telegraf(process.env.BOT_TOKENS);
 
 const stage = new Scenes.Stage([
   addCourseScene,
