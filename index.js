@@ -1,7 +1,6 @@
 require('dotenv').config();
 const { Telegraf, Scenes, session, Markup } = require('telegraf');
 const { readDB, writeDB } = require('./db');
-const { isAdmin, mainMenu, adminMenu } = require('./keyboards');
 const {
   addCourseScene,
   addTeacherScene,
@@ -13,9 +12,8 @@ const BOT_TOKEN = "8769055476:AAFwA_ESwYIxH3Y8_zpgjNhtZnjgoM5LPcc";
 const ADMIN_ID = "8584049635";  
 
 const bot = new Telegraf(BOT_TOKEN);
-const { isAdmin, mainMenu, adminMenu } = require('./keyboards');
 const isAdmin = (ctx) => {
-  return ADMIN_ID === ctx.from.id.toString();
+  return ctx.from.id.toString() === ADMIN_ID;
 };
 
 const stage = new Scenes.Stage([
