@@ -9,12 +9,13 @@ const {
   sendNewsScene,
 } = require('./scenes');
 
-if (!process.env.BOT_TOKENS) {
-  console.error("❌ .env faylida BOT_TOKENS ko'rsatilmagan!");
-  process.exit(1);
-}
+const BOT_TOKEN = "8769055476:AAFwA_ESwYIxH3Y8_zpgjNhtZnjgoM5LPcc";
+const ADMIN_ID = "8584049635";  
 
-const bot = new Telegraf(process.env.BOT_TOKENS);
+const bot = new Telegraf(BOT_TOKEN);
+const isAdmin = (ctx) => {
+  return ADMIN_ID === ctx.from.id.toString();
+};
 
 const stage = new Scenes.Stage([
   addCourseScene,
