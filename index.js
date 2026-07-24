@@ -1,103 +1,37 @@
 require('dotenv').config();
 const { Telegraf, Scenes, session, Markup } = require('telegraf');
-const express = require('express');
-const cors = require('cors');
 const { readDB, writeDB } = require('./db');
-const { mainMenu, adminMenu, isAdmin } = require('./keyboards');
+const { isAdmin, isLoggedIn, getUserRole, loginMenu, mainMenu, adminMenu, courseEnrollInline, backToMain } = require('./keyboards');
 const {
+  loginScene,
   addCourseScene,
   addTeacherScene,
   addStudentScene,
   sendNewsScene,
   addGradeScene,
   attendanceScene,
+  addPaymentScene,
 } = require('./scenes');
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
-const MINI_APP_URL = process.env.MINI_APP_URL || 'https://edu-manager-nine-theta.vercel.app';
-const PORT = process.env.PORT || 3000;
 
 if (!BOT_TOKEN) {
   console.error('❌ BOT_TOKEN topilmadi! .env faylini tekshiring.');
   process.exit(1);
 }
 
-// ========== EXPRESS SERVER (Mini App API) ==========
-const app = express();
-app.use(cors());
-app.use(express.json());
-
-// API Routes
-app.get('/api/courses', (req, res) => {
-  try {
-    const db = readDB();
-    const courses = db.courses.map(c => {
-      const teacher = db.teachers.find(t => String(t.id) === String(c.teacherId));
-      const enrolledCount = db.enrollments.filter(e => String(e.courseId) === String(c.id)).length;
-      return { ...c, teacherName: teacher ? teacher.name : "Noma'lum", enrolledCount };
-    });
-    res.json(courses);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-app.get('/api/teachers', (req, res) => {
-  try {
-    const db = readDB();
-    res.json(db.teachers);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-app.get('/api/students', (req, res) => {
-  try {
-    const db = readDB();
-    res.json(db.students);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-app.get('/api/news', (req, res) => {
-  try {
-    const db = readDB();
-    res.json(db.news.slice(-10).reverse());
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-app.get('/api/stats', (req, res) => {
-  try {
-    const db = readDB();
-    res.json({
-      students: db.students.length,
-      teachers: db.teachers.length,
-      courses: db.courses.length,
-      enrollments: db.enrollments.length,
-      news: db.news.length,
-    });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-app.listen(PORT, () => {
-  console.log(`🌐 API server ishga tushdi: http://localhost:${PORT}`);
-});
-
 // ========== TELEGRAF BOT ==========
 const bot = new Telegraf(BOT_TOKEN);
 
 const stage = new Scenes.Stage([
+  loginScene,
   addCourseScene,
   addTeacherScene,
   addStudentScene,
   sendNewsScene,
   addGradeScene,
   attendanceScene,
+  addPaymentScene,
 ]);
 
 bot.use(session());
@@ -105,202 +39,266 @@ bot.use(stage.middleware());
 
 // ========== /start ==========
 bot.start(async (ctx) => {
-  try {
-    const db = readDB();
-    const exists = db.students.find((s) => s.telegramId === ctx.from.id);
+  const db = readDB();
+  const sessionData = db.sessions[ctx.from.id];
 
-    if (!exists) {
-      db.students.push({
-        id: 'tg_' + ctx.from.id,
-        telegramId: ctx.from.id,
-        name: ctx.from.first_name + (ctx.from.last_name ? ' ' + ctx.from.last_name : ''),
-        username: ctx.from.username || null,
-        phone: null,
-        email: null,
-        joinedAt: new Date().toISOString(),
-      });
-      writeDB(db);
-    }
-
+  if (sessionData && sessionData.loggedIn) {
     await ctx.reply(
-      `👋 *Assalomu alaykum, ${ctx.from.first_name}!*\n\n🎓 *Edu Manager* botiga xush kelibsiz!\n\nBu yerda siz:\n📚 Kurslarni ko'rishingiz\n👨‍🏫 O'qituvchilar haqida ma'lumot olishingiz\n📰 Yangiliklarni kuzatishingiz\n📖 Kurslarga yozilishingiz\n💳 To'lovlaringizni ko'rishingiz mumkin.\n\nKerakli bo'limni tanlang 👇`,
-      { parse_mode: 'Markdown', ...mainMenu(isAdmin(ctx)) }
+      `👋 *Qaytib keldingiz, ${sessionData.name}!*\n\n🎓 Edu Manager botiga xush kelibsiz!\n\nKerakli bo'limni tanlang 👇`,
+      { parse_mode: 'Markdown', ...mainMenu(sessionData.role) }
     );
-  } catch (e) {
-    console.error('Start error:', e);
-    await ctx.reply("❌ Xatolik yuz berdi. Qayta urinib ko'ring.");
+  } else {
+    await ctx.reply(
+      `👋 *Assalomu alaykum!*\n\n🎓 *Edu Manager* botiga xush kelibsiz!\n\nTizimga kirish uchun *Login* tugmasini bosing.\n\n📧 *Test login:*\n• jasur@edumanager.uz / 12345678\n• admin / admin123`,
+      { parse_mode: 'Markdown', ...loginMenu }
+    );
   }
 });
 
-// ========== Admin Panel ==========
-bot.hears('⚙️ Admin panel', async (ctx) => {
-  if (!isAdmin(ctx)) {
-    return ctx.reply("❌ Sizda admin huquqlari yo'q!");
+// ========== 🔐 Login ==========
+bot.hears('🔐 Login', async (ctx) => {
+  ctx.scene.enter('LOGIN');
+});
+
+// ========== Logout ==========
+bot.command('logout', async (ctx) => {
+  const db = readDB();
+  delete db.sessions[ctx.from.id];
+  writeDB(db);
+  await ctx.reply(
+    '👋 *Tizimdan chiqdingiz.*\n\nQaytib kirish uchun /start bosing.',
+    { parse_mode: 'Markdown', ...loginMenu }
+  );
+});
+
+// ========== Check Auth Middleware ==========
+function requireAuth(ctx) {
+  const db = readDB();
+  const sessionData = db.sessions[ctx.from.id];
+  if (!sessionData || !sessionData.loggedIn) {
+    ctx.reply(
+      '🔐 *Avval tizimga kiring!*\n\n/login yoki /start buyrug\'ini bosing.',
+      { parse_mode: 'Markdown', ...loginMenu }
+    );
+    return false;
   }
+  return true;
+}
+
+function requireAdmin(ctx) {
+  if (!requireAuth(ctx)) return false;
+  const db = readDB();
+  const sessionData = db.sessions[ctx.from.id];
+  if (sessionData.role !== 'admin') {
+    ctx.reply('❌ *Bu bo\'lim faqat adminlar uchun!*', { parse_mode: 'Markdown' });
+    return false;
+  }
+  return true;
+}
+
+// ========== ⚙️ Admin panel ==========
+bot.hears('⚙️ Admin panel', async (ctx) => {
+  if (!requireAdmin(ctx)) return;
   await ctx.reply(
     '🔧 *Admin Paneli*\n\nQuyidagi amallardan birini tanlang:',
     { parse_mode: 'Markdown', ...adminMenu }
   );
 });
 
-// ========== Orqaga ==========
-bot.hears('⬅️ Orqaga', async (ctx) => {
-  await ctx.reply('🏠 *Asosiy menu*', { parse_mode: 'Markdown', ...mainMenu(isAdmin(ctx)) });
+// ========== ⬅️ Asosiy menu ==========
+bot.hears('⬅️ Asosiy menu', async (ctx) => {
+  if (!requireAuth(ctx)) return;
+  const db = readDB();
+  const sessionData = db.sessions[ctx.from.id];
+  await ctx.reply('🏠 *Asosiy menu*', { parse_mode: 'Markdown', ...mainMenu(sessionData.role) });
 });
 
 // ========== Admin Scenes ==========
 bot.hears("➕ Kurs qo'shish", (ctx) => {
-  if (!isAdmin(ctx)) return ctx.reply("❌ Sizda admin huquqlari yo'q!");
+  if (!requireAdmin(ctx)) return;
   ctx.scene.enter('ADD_COURSE');
 });
 
 bot.hears("➕ O'qituvchi qo'shish", (ctx) => {
-  if (!isAdmin(ctx)) return ctx.reply("❌ Sizda admin huquqlari yo'q!");
+  if (!requireAdmin(ctx)) return;
   ctx.scene.enter('ADD_TEACHER');
 });
 
 bot.hears("➕ O'quvchi qo'shish", (ctx) => {
-  if (!isAdmin(ctx)) return ctx.reply("❌ Sizda admin huquqlari yo'q!");
+  if (!requireAdmin(ctx)) return;
   ctx.scene.enter('ADD_STUDENT');
 });
 
 bot.hears('📢 Yangilik yuborish', (ctx) => {
-  if (!isAdmin(ctx)) return ctx.reply("❌ Sizda admin huquqlari yo'q!");
+  if (!requireAdmin(ctx)) return;
   ctx.scene.enter('SEND_NEWS');
 });
 
 bot.hears("✏️ Baho qo'yish", (ctx) => {
-  if (!isAdmin(ctx)) return ctx.reply("❌ Sizda admin huquqlari yo'q!");
+  if (!requireAuth(ctx)) return;
+  const db = readDB();
+  const sessionData = db.sessions[ctx.from.id];
+  if (sessionData.role !== 'admin' && sessionData.role !== 'teacher') {
+    return ctx.reply('❌ *Bu bo\'lim faqat o\'qituvchilar va adminlar uchun!*', { parse_mode: 'Markdown' });
+  }
   ctx.scene.enter('ADD_GRADE');
 });
 
 bot.hears('✅ Davomat olish', (ctx) => {
-  if (!isAdmin(ctx)) return ctx.reply("❌ Sizda admin huquqlari yo'q!");
+  if (!requireAdmin(ctx)) return;
   ctx.scene.enter('ATTENDANCE');
+});
+
+bot.hears("💰 To'lovlar", (ctx) => {
+  if (!requireAdmin(ctx)) return;
+  ctx.scene.enter('ADD_PAYMENT');
 });
 
 // ========== 📊 Statistika ==========
 bot.hears('📊 Statistika', async (ctx) => {
-  if (!isAdmin(ctx)) return ctx.reply("❌ Sizda admin huquqlari yo'q!");
-  try {
-    const db = readDB();
-    const stats = `📊 *Umumiy statistika*\n\n👥 Talabalar: *${db.students.length}*\n👨‍🏫 O'qituvchilar: *${db.teachers.length}*\n📚 Kurslar: *${db.courses.length}*\n📝 Yozilmalar: *${db.enrollments.length}*\n⭐ Baholar: *${db.grades.length}*\n📅 Davomat: *${db.attendance.length}*\n💰 To'lovlar: *${db.payments.length}*\n📰 Yangiliklar: *${db.news.length}*`;
-    await ctx.reply(stats, { parse_mode: 'Markdown' });
-  } catch (e) {
-    console.error('Stats error:', e);
-    await ctx.reply('❌ Xatolik yuz berdi.');
-  }
+  if (!requireAdmin(ctx)) return;
+  const db = readDB();
+  const stats = `📊 *Umumiy statistika*
+
+👥 Foydalanuvchilar: *${db.users.length}*
+👨‍🏫 O'qituvchilar: *${db.teachers.length}*
+👤 O'quvchilar: *${db.students.length}*
+📚 Kurslar: *${db.courses.length}*
+📝 Yozilmalar: *${db.enrollments.length}*
+⭐ Baholar: *${db.grades.length}*
+📅 Davomat: *${db.attendance.length}*
+💰 To'lovlar: *${db.payments.length}*
+📰 Yangiliklar: *${db.news.length}*`;
+  await ctx.reply(stats, { parse_mode: 'Markdown' });
 });
 
 // ========== 📋 Barcha o'quvchilar ==========
 bot.hears("📋 Barcha o'quvchilar", async (ctx) => {
-  if (!isAdmin(ctx)) return ctx.reply("❌ Sizda admin huquqlari yo'q!");
-  try {
-    const db = readDB();
-    if (db.students.length === 0) {
-      return ctx.reply("📭 Hozircha o'quvchilar mavjud emas.");
-    }
-    let text = `📋 *Barcha o'quvchilar* (${db.students.length} ta):\n\n`;
-    db.students.forEach((s, i) => {
-      const type = s.telegramId ? '🤖 Bot' : "👤 Qo'lda";
-      text += `${i + 1}. *${s.name}*\n   ${type} | 📞 ${s.phone || "Noma'lum"}\n   📅 ${new Date(s.joinedAt).toLocaleDateString('uz-UZ')}\n\n`;
-    });
-    await ctx.reply(text, { parse_mode: 'Markdown' });
-  } catch (e) {
-    console.error('Students error:', e);
-    await ctx.reply('❌ Xatolik yuz berdi.');
+  if (!requireAdmin(ctx)) return;
+  const db = readDB();
+  if (db.students.length === 0) {
+    return ctx.reply("📭 Hozircha o'quvchilar mavjud emas.");
   }
-});
-
-// ========== 💰 To'lovlar (admin) ==========
-bot.hears("💰 To'lovlar", async (ctx) => {
-  if (!isAdmin(ctx)) return;
-  try {
-    const db = readDB();
-    if (db.payments.length === 0) {
-      return ctx.reply("📭 Hozircha to'lovlar mavjud emas.");
-    }
-    let text = `💰 *To'lovlar* (${db.payments.length} ta):\n\n`;
-    db.payments.forEach((p, i) => {
-      const student = db.students.find(s => s.id === p.studentId);
-      text += `${i + 1}. *${student?.name || "Noma'lum"}*\n   💵 ${p.amount.toLocaleString()} so'm\n   📅 ${new Date(p.date).toLocaleDateString('uz-UZ')}\n   📝 ${p.note || ''}\n\n`;
-    });
-    await ctx.reply(text, { parse_mode: 'Markdown' });
-  } catch (e) {
-    console.error('Payments error:', e);
-    await ctx.reply('❌ Xatolik yuz berdi.');
-  }
+  let text = `📋 *Barcha o'quvchilar* (${db.students.length} ta):\n\n`;
+  db.students.forEach((s, i) => {
+    const enrollments = db.enrollments.filter(e => e.studentId === s.id).length;
+    text += `${i + 1}. *${s.name}*\n   📞 ${s.phone || "Noma'lum"}\n   📧 ${s.email || "Noma'lum"}\n   📚 Kurslar: ${enrollments} ta\n\n`;
+  });
+  await ctx.reply(text, { parse_mode: 'Markdown' });
 });
 
 // ========== 🗓 Dars jadvali ==========
 bot.hears('🗓 Dars jadvali', async (ctx) => {
-  if (!isAdmin(ctx)) return ctx.reply("❌ Sizda admin huquqlari yo'q!");
-  try {
-    const db = readDB();
+  if (!requireAuth(ctx)) return;
+  const db = readDB();
+  const sessionData = db.sessions[ctx.from.id];
+
+  if (sessionData.role === 'admin') {
     if (db.schedule.length === 0) {
       return ctx.reply('📭 Hozircha dars jadvali mavjud emas.');
     }
     let text = `🗓 *Dars jadvali*:\n\n`;
     db.schedule.forEach((s) => {
-      const course = db.courses.find(c => String(c.id) === String(s.courseId));
-      text += `📖 *${course?.name || "Noma'lum"}*\n🕐 ${s.time}\n📅 ${s.days}\n\n`;
+      const course = db.courses.find(c => c.id === s.courseId);
+      text += `📖 *${course?.name || "Noma'lum"}*\n📅 ${s.day}\n🕐 ${s.time}\n🏫 ${s.room}\n\n`;
     });
     await ctx.reply(text, { parse_mode: 'Markdown' });
-  } catch (e) {
-    console.error('Schedule error:', e);
-    await ctx.reply('❌ Xatolik yuz berdi.');
+  } else {
+    const user = db.users.find(u => u.id === sessionData.userId);
+    const student = db.students.find(s => s.userId === user.id);
+    if (!student) {
+      return ctx.reply('📭 Sizda hali dars jadvali mavjud emas.');
+    }
+    const myCourses = db.enrollments.filter(e => e.studentId === student.id).map(e => e.courseId);
+    const mySchedule = db.schedule.filter(s => myCourses.includes(s.courseId));
+    if (mySchedule.length === 0) {
+      return ctx.reply('📭 Sizda hali dars jadvali mavjud emas.');
+    }
+    let text = `🗓 *Mening dars jadvalim*:\n\n`;
+    mySchedule.forEach((s) => {
+      const course = db.courses.find(c => c.id === s.courseId);
+      text += `📖 *${course?.name || "Noma'lum"}*\n📅 ${s.day}\n🕐 ${s.time}\n🏫 ${s.room}\n\n`;
+    });
+    await ctx.reply(text, { parse_mode: 'Markdown' });
   }
 });
 
 // ========== 📚 Kurslar ==========
 bot.hears('📚 Kurslar', async (ctx) => {
-  try {
-    const db = readDB();
-    if (db.courses.length === 0) {
-      return ctx.reply('📭 Hozircha kurslar mavjud emas.');
-    }
+  if (!requireAuth(ctx)) return;
+  const db = readDB();
+  const sessionData = db.sessions[ctx.from.id];
 
-    await ctx.reply(`📚 *Mavjud kurslar* (${db.courses.length} ta):`, { parse_mode: 'Markdown' });
+  if (db.courses.length === 0) {
+    return ctx.reply('📭 Hozircha kurslar mavjud emas.');
+  }
 
-    for (const c of db.courses) {
-      const teacher = db.teachers.find((t) => String(t.id) === String(c.teacherId));
-      const enrolledCount = db.enrollments.filter(e => String(e.courseId) === String(c.id)).length;
-      await ctx.reply(
-        `📖 *${c.name}*\n\n📝 ${c.description}\n💰 Narxi: *${c.price.toLocaleString()}* so'm\n📅 Davomiyligi: ${c.duration || "Noma'lum"}\n👨‍🏫 O'qituvchi: ${teacher ? teacher.name : "Noma'lum"}\n👥 Yozilgan: ${enrolledCount} ta\n📅 Sana: ${new Date(c.createdAt).toLocaleDateString('uz-UZ')}`,
-        {
-          parse_mode: 'Markdown',
-          ...Markup.inlineKeyboard([
-            [Markup.button.callback('✅ Yozilish', `enroll_${c.id}`)],
-          ]),
-        }
-      );
-    }
-  } catch (e) {
-    console.error('Courses error:', e);
-    await ctx.reply('❌ Xatolik yuz berdi.');
+  await ctx.reply(`📚 *Mavjud kurslar* (${db.courses.length} ta):`, { parse_mode: 'Markdown' });
+
+  for (const c of db.courses) {
+    const teacher = db.teachers.find((t) => t.id === c.teacherId);
+    const enrolledCount = db.enrollments.filter(e => e.courseId === c.id).length;
+    const isFull = enrolledCount >= c.maxStudents;
+
+    let text = `📖 *${c.name}*\n\n📝 ${c.description}\n💰 Narxi: *${c.price.toLocaleString()}* so'm\n📅 Davomiyligi: ${c.duration}\n👨‍🏫 O'qituvchi: ${teacher ? teacher.name : "Noma'lum"}\n👥 Yozilgan: ${enrolledCount} / ${c.maxStudents}\n`;
+    if (isFull) text += `⚠️ *Joylar tugagan!*`;
+
+    await ctx.reply(
+      text,
+      {
+        parse_mode: 'Markdown',
+        ...courseEnrollInline(c.id),
+      }
+    );
   }
 });
 
-// ========== Yozilish ==========
+// ========== Kursga Yozilish ==========
 bot.action(/enroll_(.+)/, async (ctx) => {
   try {
     const courseId = ctx.match[1];
     const db = readDB();
-    const student = db.students.find((s) => s.telegramId === ctx.from.id);
-    const course = db.courses.find((c) => String(c.id) === String(courseId));
+    const sessionData = db.sessions[ctx.from.id];
 
-    if (!student || !course) {
-      return ctx.answerCbQuery("❌ Xatolik yuz berdi, /start bosib qayta urinib ko'ring.");
+    if (!sessionData || !sessionData.loggedIn) {
+      return ctx.answerCbQuery('🔐 Avval tizimga kiring!');
+    }
+
+    const user = db.users.find(u => u.id === sessionData.userId);
+    const course = db.courses.find((c) => c.id === courseId);
+
+    if (!user || !course) {
+      return ctx.answerCbQuery('❌ Xatolik yuz berdi.');
+    }
+
+    let student = db.students.find(s => s.userId === user.id);
+    if (!student) {
+      student = {
+        id: 'student_' + Date.now(),
+        userId: user.id,
+        name: user.name,
+        phone: user.phone,
+        email: user.email,
+        telegramId: ctx.from.id,
+        joinedAt: new Date().toISOString(),
+      };
+      db.students.push(student);
     }
 
     const already = db.enrollments.find(
-      (e) => e.studentId === student.id && String(e.courseId) === String(course.id)
+      (e) => e.studentId === student.id && e.courseId === course.id
     );
     if (already) {
       return ctx.answerCbQuery('⚠️ Siz allaqachon bu kursga yozilgansiz.');
     }
 
+    const enrolledCount = db.enrollments.filter(e => e.courseId === course.id).length;
+    if (enrolledCount >= course.maxStudents) {
+      return ctx.answerCbQuery('❌ Joylar tugagan!');
+    }
+
     db.enrollments.push({
+      id: 'enroll_' + Date.now(),
       studentId: student.id,
       courseId: course.id,
       date: new Date().toISOString(),
@@ -320,7 +318,7 @@ bot.action(/enroll_(.+)/, async (ctx) => {
       try {
         await ctx.telegram.sendMessage(
           adminId,
-          `📢 *Yangi yozilish!*\n\n👤 ${student.name}\n📖 ${course.name}\n📞 ${student.phone || 'Telefon kiritilmagan'}`,
+          `📢 *Yangi yozilish!*\n\n👤 ${user.name}\n📖 ${course.name}\n📞 ${user.phone || 'Telefon kiritilmagan'}`,
           { parse_mode: 'Markdown' }
         );
       } catch (e) {}
@@ -331,187 +329,251 @@ bot.action(/enroll_(.+)/, async (ctx) => {
   }
 });
 
-// ========== 👨‍🏫 O'qituvchilar ==========
-bot.hears("👨‍🏫 O'qituvchilar", async (ctx) => {
+// ========== Kurs Batafsil ==========
+bot.action(/detail_(.+)/, async (ctx) => {
   try {
+    const courseId = ctx.match[1];
     const db = readDB();
-    if (db.teachers.length === 0) {
-      return ctx.reply("📭 Hozircha o'qituvchilar mavjud emas.");
+    const course = db.courses.find((c) => c.id === courseId);
+    if (!course) return ctx.answerCbQuery('❌ Kurs topilmadi.');
+
+    const teacher = db.teachers.find((t) => t.id === course.teacherId);
+    const enrolledCount = db.enrollments.filter(e => e.courseId === course.id).length;
+    const schedule = db.schedule.filter(s => s.courseId === course.id);
+
+    let text = `📋 *${course.name}* — Batafsil\n\n📝 ${course.description}\n\n💰 *Narxi:* ${course.price.toLocaleString()} so'm\n📅 *Davomiyligi:* ${course.duration}\n👨‍🏫 *O'qituvchi:* ${teacher ? teacher.name : "Noma'lum"}\n👥 *Joylar:* ${enrolledCount} / ${course.maxStudents}\n\n`;
+
+    if (schedule.length > 0) {
+      text += `🗓 *Dars jadvali:*\n`;
+      schedule.forEach(s => {
+        text += `• ${s.day} — ${s.time} (${s.room})\n`;
+      });
     }
 
-    let text = `👨‍🏫 *O'qituvchilar ro'yxati* (${db.teachers.length} ta):\n\n`;
-    db.teachers.forEach((t, index) => {
-      const coursesCount = db.courses.filter(c => String(c.teacherId) === String(t.id)).length;
-      text += `${index + 1}. *${t.name}*\n   📚 Fan: ${t.subject}\n   📞 ${t.phone}\n   📖 Kurslar: ${coursesCount} ta\n\n`;
-    });
+    await ctx.answerCbQuery('✅');
     await ctx.reply(text, { parse_mode: 'Markdown' });
   } catch (e) {
-    console.error('Teachers error:', e);
-    await ctx.reply('❌ Xatolik yuz berdi.');
+    console.error('Detail error:', e);
+    await ctx.answerCbQuery('❌ Xatolik.');
   }
+});
+
+// ========== 👨‍🏫 O'qituvchilar ==========
+bot.hears("👨‍🏫 O'qituvchilar", async (ctx) => {
+  if (!requireAuth(ctx)) return;
+  const db = readDB();
+  if (db.teachers.length === 0) {
+    return ctx.reply("📭 Hozircha o'qituvchilar mavjud emas.");
+  }
+
+  let text = `👨‍🏫 *O'qituvchilar ro'yxati* (${db.teachers.length} ta):\n\n`;
+  db.teachers.forEach((t, index) => {
+    const coursesCount = db.courses.filter(c => c.teacherId === t.id).length;
+    text += `${index + 1}. *${t.name}*\n   📚 Fan: ${t.subject}\n   📞 ${t.phone}\n   📖 Kurslar: ${coursesCount} ta\n\n`;
+  });
+  await ctx.reply(text, { parse_mode: 'Markdown' });
 });
 
 // ========== 📰 Yangiliklar ==========
 bot.hears('📰 Yangiliklar', async (ctx) => {
-  try {
-    const db = readDB();
-    if (db.news.length === 0) {
-      return ctx.reply('📭 Hozircha yangiliklar mavjud emas.');
-    }
+  if (!requireAuth(ctx)) return;
+  const db = readDB();
+  if (db.news.length === 0) {
+    return ctx.reply('📭 Hozircha yangiliklar mavjud emas.');
+  }
 
-    const last = db.news.slice(-5).reverse();
-    await ctx.reply(`📰 *So'nggi yangiliklar* (${last.length} ta):`, { parse_mode: 'Markdown' });
+  const last = db.news.slice(-5).reverse();
+  await ctx.reply(`📰 *So'nggi yangiliklar* (${last.length} ta):`, { parse_mode: 'Markdown' });
 
-    for (const n of last) {
-      await ctx.reply(
-        `📅 *${new Date(n.date).toLocaleDateString('uz-UZ')}*\n\n${n.text}`,
-        { parse_mode: 'Markdown' }
-      );
-    }
-  } catch (e) {
-    console.error('News error:', e);
-    await ctx.reply('❌ Xatolik yuz berdi.');
+  for (const n of last) {
+    await ctx.reply(
+      `📰 *${n.title}*\n\n${n.text}\n\n📅 ${new Date(n.date).toLocaleDateString('uz-UZ')}`,
+      { parse_mode: 'Markdown' }
+    );
   }
 });
 
 // ========== 📖 Mening darslarim ==========
 bot.hears('📖 Mening darslarim', async (ctx) => {
-  try {
-    const db = readDB();
-    const student = db.students.find((s) => s.telegramId === ctx.from.id);
-    if (!student) {
-      return ctx.reply("⚠️ Avval /start buyrug'ini bosing.");
-    }
+  if (!requireAuth(ctx)) return;
+  const db = readDB();
+  const sessionData = db.sessions[ctx.from.id];
+  const user = db.users.find(u => u.id === sessionData.userId);
 
-    const myEnrollments = db.enrollments.filter((e) => e.studentId === student.id);
-    if (myEnrollments.length === 0) {
-      return ctx.reply(
-        '📭 Siz hali hech qanday kursga yozilmagansiz.\n\n📚 "Kurslar" bo\'limiga o\'ting.',
-        mainMenu(isAdmin(ctx))
-      );
-    }
-
-    let text = '📖 *Mening darslarim*:\n\n';
-    myEnrollments.forEach((e, index) => {
-      const course = db.courses.find((c) => String(c.id) === String(e.courseId));
-      if (course) {
-        const teacher = db.teachers.find((t) => String(t.id) === String(course.teacherId));
-        const grades = db.grades.filter(g => g.studentId === student.id && String(g.courseId) === String(course.id));
-        const avgGrade = grades.length > 0 ? (grades.reduce((a, b) => a + b.grade, 0) / grades.length).toFixed(1) : "Baholar yo'q";
-        text += `${index + 1}. *${course.name}*\n   👨‍🏫 ${teacher ? teacher.name : "Noma'lum o'qituvchi"}\n   📅 ${new Date(e.date).toLocaleDateString('uz-UZ')}\n   ⭐ O'rtacha baho: ${avgGrade}\n\n`;
-      }
-    });
-    await ctx.reply(text, { parse_mode: 'Markdown' });
-  } catch (e) {
-    console.error('My courses error:', e);
-    await ctx.reply('❌ Xatolik yuz berdi.');
+  let student = db.students.find(s => s.userId === user.id);
+  if (!student) {
+    student = {
+      id: 'student_' + Date.now(),
+      userId: user.id,
+      name: user.name,
+      phone: user.phone,
+      email: user.email,
+      telegramId: ctx.from.id,
+      joinedAt: new Date().toISOString(),
+    };
+    db.students.push(student);
+    writeDB(db);
   }
+
+  const myEnrollments = db.enrollments.filter((e) => e.studentId === student.id);
+  if (myEnrollments.length === 0) {
+    return ctx.reply(
+      '📭 Siz hali hech qanday kursga yozilmagansiz.\n\n📚 "Kurslar" bo\'limiga o\'ting.',
+      mainMenu(sessionData.role)
+    );
+  }
+
+  let text = '📖 *Mening darslarim*:\n\n';
+  myEnrollments.forEach((e, index) => {
+    const course = db.courses.find((c) => c.id === e.courseId);
+    if (course) {
+      const teacher = db.teachers.find((t) => t.id === course.teacherId);
+      const grades = db.grades.filter(g => g.studentId === student.id && g.courseId === course.id);
+      const avgGrade = grades.length > 0 ? (grades.reduce((a, b) => a + b.grade, 0) / grades.length).toFixed(1) : "Baholar yo'q";
+      text += `${index + 1}. *${course.name}*\n   👨‍🏫 ${teacher ? teacher.name : "Noma'lum o'qituvchi"}\n   📅 ${new Date(e.date).toLocaleDateString('uz-UZ')}\n   ⭐ O'rtacha baho: ${avgGrade}\n\n`;
+    }
+  });
+  await ctx.reply(text, { parse_mode: 'Markdown' });
 });
 
 // ========== 📊 Baholarim ==========
 bot.hears('📊 Baholarim', async (ctx) => {
-  try {
-    const db = readDB();
-    const student = db.students.find((s) => s.telegramId === ctx.from.id);
-    if (!student) {
-      return ctx.reply("⚠️ Avval /start buyrug'ini bosing.");
-    }
+  if (!requireAuth(ctx)) return;
+  const db = readDB();
+  const sessionData = db.sessions[ctx.from.id];
+  const user = db.users.find(u => u.id === sessionData.userId);
+  const student = db.students.find(s => s.userId === user.id);
 
-    const myGrades = db.grades.filter((g) => g.studentId === student.id);
-    if (myGrades.length === 0) {
-      return ctx.reply("📭 Sizga hali baho qo'yilmagan.");
-    }
-
-    let text = '📊 *Mening baholarim*:\n\n';
-    myGrades.forEach((g) => {
-      const course = db.courses.find((c) => String(c.id) === String(g.courseId));
-      text += `📖 *${course?.name || "Noma'lum"}*\n   ⭐ Baho: *${g.grade}*\n   📅 ${new Date(g.date).toLocaleDateString('uz-UZ')}\n\n`;
-    });
-
-    const avg = (myGrades.reduce((a, b) => a + b.grade, 0) / myGrades.length).toFixed(1);
-    text += `📈 *O'rtacha baho: ${avg}*`;
-    await ctx.reply(text, { parse_mode: 'Markdown' });
-  } catch (e) {
-    console.error('Grades error:', e);
-    await ctx.reply('❌ Xatolik yuz berdi.');
+  if (!student) {
+    return ctx.reply("📭 Sizga hali baho qo'yilmagan.");
   }
+
+  const myGrades = db.grades.filter((g) => g.studentId === student.id);
+  if (myGrades.length === 0) {
+    return ctx.reply("📭 Sizga hali baho qo'yilmagan.");
+  }
+
+  let text = '📊 *Mening baholarim*:\n\n';
+  myGrades.forEach((g) => {
+    const course = db.courses.find((c) => c.id === g.courseId);
+    text += `📖 *${course?.name || "Noma'lum"}*\n   ⭐ Baho: *${g.grade}*\n   📅 ${new Date(g.date).toLocaleDateString('uz-UZ')}\n\n`;
+  });
+
+  const avg = (myGrades.reduce((a, b) => a + b.grade, 0) / myGrades.length).toFixed(1);
+  text += `📈 *O'rtacha baho: ${avg}*`;
+  await ctx.reply(text, { parse_mode: 'Markdown' });
 });
 
-// ========== 💳 To'lovlar (user) ==========
-bot.hears("💳 To'lovlar", async (ctx) => {
-  if (isAdmin(ctx)) return; // Admin uchun yuqorida ishlaydi
-  try {
-    const db = readDB();
-    const student = db.students.find((s) => s.telegramId === ctx.from.id);
-    if (!student) {
-      return ctx.reply("⚠️ Avval /start buyrug'ini bosing.");
-    }
+// ========== 💳 To'lovlarim ==========
+bot.hears("💳 To'lovlarim", async (ctx) => {
+  if (!requireAuth(ctx)) return;
+  const db = readDB();
+  const sessionData = db.sessions[ctx.from.id];
+  const user = db.users.find(u => u.id === sessionData.userId);
+  const student = db.students.find(s => s.userId === user.id);
 
-    const myPayments = db.payments.filter((p) => p.studentId === student.id);
-    if (myPayments.length === 0) {
-      return ctx.reply("📭 Sizda hali to'lovlar mavjud emas.\n\nTo'lov qilish uchun admin bilan bog'laning.");
-    }
-
-    let text = "💳 *Mening to'lovlarim*:\n\n";
-    myPayments.forEach((p) => {
-      text += `💵 *${p.amount.toLocaleString()}* so'm\n📅 ${new Date(p.date).toLocaleDateString('uz-UZ')}\n📝 ${p.note || ''}\n\n`;
-    });
-    await ctx.reply(text, { parse_mode: 'Markdown' });
-  } catch (e) {
-    console.error('Payments user error:', e);
-    await ctx.reply('❌ Xatolik yuz berdi.');
+  if (!student) {
+    return ctx.reply("📭 Sizda hali to'lovlar mavjud emas.");
   }
+
+  const myPayments = db.payments.filter((p) => p.studentId === student.id);
+  if (myPayments.length === 0) {
+    return ctx.reply("📭 Sizda hali to'lovlar mavjud emas.\n\nTo'lov qilish uchun admin bilan bog'laning.");
+  }
+
+  let text = "💳 *Mening to'lovlarim*:\n\n";
+  let total = 0;
+  myPayments.forEach((p) => {
+    total += p.amount;
+    text += `💵 *${p.amount.toLocaleString()}* so'm\n📅 ${new Date(p.date).toLocaleDateString('uz-UZ')}\n📝 ${p.note || ''}\n\n`;
+  });
+  text += `💰 *Jami: ${total.toLocaleString()} so'm*`;
+  await ctx.reply(text, { parse_mode: 'Markdown' });
 });
 
-// ========== 🌐 Web App (Mini App) ==========
-bot.hears('🌐 Web App', async (ctx) => {
-  try {
-    await ctx.reply(
-      "🌐 *Edu Manager Web App*\n\nTo'liq funksionallikka ega web ilovamizni oching:",
-      {
-        parse_mode: 'Markdown',
-        ...Markup.inlineKeyboard([
-          [Markup.button.webApp('🚀 Web Appni ochish', { url: MINI_APP_URL })],
-        ]),
-      }
-    );
-  } catch (e) {
-    console.error('WebApp error:', e);
-    await ctx.reply('❌ Xatolik yuz berdi.');
-  }
+// ========== 👤 Profil ==========
+bot.hears('👤 Profil', async (ctx) => {
+  if (!requireAuth(ctx)) return;
+  const db = readDB();
+  const sessionData = db.sessions[ctx.from.id];
+  const user = db.users.find(u => u.id === sessionData.userId);
+
+  const roleText = {
+    admin: '👑 Admin',
+    teacher: '👨‍🏫 O\'qituvchi',
+    student: '👤 O\'quvchi'
+  };
+
+  let text = `👤 *Mening profilim*\n\n`;
+  text += `📝 *Ism:* ${user.name}\n`;
+  text += `📧 *Email:* ${user.email}\n`;
+  text += `📞 *Telefon:* ${user.phone || "Noma'lum"}\n`;
+  text += `🎭 *Rol:* ${roleText[user.role] || user.role}\n`;
+  text += `📅 *Ro'yxatdan o'tgan:* ${new Date(user.createdAt).toLocaleDateString('uz-UZ')}\n\n`;
+  text += `🔓 Chiqish uchun: /logout`;
+
+  await ctx.reply(text, { parse_mode: 'Markdown' });
 });
 
 // ========== ❓ Yordam ==========
 bot.hears('❓ Yordam', async (ctx) => {
-  const helpText = "📖 *Yordam*\n\n*Asosiy buyruqlar:*\n/start — Botni ishga tushirish\n/help — Yordam\n\n*Bo'limlar:*\n📚 Kurslar — Mavjud kurslarni ko'rish va yozilish\n👨‍🏫 O'qituvchilar — O'qituvchilar ro'yxati\n📰 Yangiliklar — So'nggi yangiliklar\n📖 Mening darslarim — Yozilgan kurslar\n📊 Baholarim — O'z baholaringiz\n💳 To'lovlar — To'lovlar tarixi\n🌐 Web App — Web ilovani ochish\n\n*Admin buyruqlari:*\n⚙️ Admin panel — Boshqaruv paneli";
+  const helpText = `📖 *Yordam*
+
+*Asosiy buyruqlar:*
+/start — Bosh sahifa
+/logout — Tizimdan chiqish
+
+*Bo'limlar:*
+📚 Kurslar — Mavjud kurslarni ko'rish va yozilish
+👨‍🏫 O'qituvchilar — O'qituvchilar ro'yxati
+📰 Yangiliklar — So'nggi yangiliklar
+📖 Mening darslarim — Yozilgan kurslar
+📊 Baholarim — O'z baholaringiz
+💳 To'lovlarim — To'lovlar tarixi
+🗓 Dars jadvali — Darslar jadvali
+👤 Profil — Shaxsiy ma'lumotlar
+
+*Test loginlar:*
+📧 jasur@edumanager.uz / 12345678
+👤 admin / admin123`;
   await ctx.reply(helpText, { parse_mode: 'Markdown' });
 });
 
 // ========== /help ==========
 bot.command('help', async (ctx) => {
-  const helpText = "📖 *Yordam*\n\n*Asosiy buyruqlar:*\n/start — Botni ishga tushirish\n/help — Yordam\n/stats — Statistika (faqat admin)\n\n*Bo'limlar:*\n📚 Kurslar — Mavjud kurslarni ko'rish\n👨‍🏫 O'qituvchilar — O'qituvchilar ro'yxati\n📰 Yangiliklar — So'nggi yangiliklar\n📖 Mening darslarim — Yozilgan kurslar\n📊 Baholarim — O'z baholaringiz\n💳 To'lovlar — To'lovlar tarixi\n🌐 Web App — Web ilovani ochish";
-  await ctx.reply(helpText, { parse_mode: 'Markdown' });
-});
+  const helpText = `📖 *Yordam*
 
-// ========== /stats (admin only) ==========
-bot.command('stats', async (ctx) => {
-  if (!isAdmin(ctx)) return;
-  try {
-    const db = readDB();
-    const stats = `📊 *Statistika*\n\n👥 Talabalar: *${db.students.length}*\n👨‍🏫 O'qituvchilar: *${db.teachers.length}*\n📚 Kurslar: *${db.courses.length}*\n📝 Yozilmalar: *${db.enrollments.length}*\n⭐ Baholar: *${db.grades.length}*\n📅 Davomat: *${db.attendance.length}*\n💰 To'lovlar: *${db.payments.length}*\n📰 Yangiliklar: *${db.news.length}*`;
-    await ctx.reply(stats, { parse_mode: 'Markdown' });
-  } catch (e) {
-    console.error('Stats command error:', e);
-    await ctx.reply('❌ Xatolik yuz berdi.');
-  }
+*Asosiy buyruqlar:*
+/start — Bosh sahifa
+/logout — Tizimdan chiqish
+
+*Bo'limlar:*
+📚 Kurslar — Mavjud kurslarni ko'rish
+👨‍🏫 O'qituvchilar — O'qituvchilar ro'yxati
+📰 Yangiliklar — So'nggi yangiliklar
+📖 Mening darslarim — Yozilgan kurslar
+📊 Baholarim — O'z baholaringiz
+💳 To'lovlarim — To'lovlar tarixi
+🗓 Dars jadvali — Darslar jadvali
+👤 Profil — Shaxsiy ma'lumotlar`;
+  await ctx.reply(helpText, { parse_mode: 'Markdown' });
 });
 
 // ========== Unknown messages ==========
 bot.on('text', async (ctx) => {
-  await ctx.reply(
-    "❓ Tushunarsiz buyruq. Iltimos, menyudan tanlang yoki /help buyrug'ini bosing.",
-    mainMenu(isAdmin(ctx))
-  );
+  const db = readDB();
+  const sessionData = db.sessions[ctx.from.id];
+  if (sessionData && sessionData.loggedIn) {
+    await ctx.reply(
+      '❓ Tushunarsiz buyruq. Iltimos, menyudan tanlang.',
+      mainMenu(sessionData.role)
+    );
+  } else {
+    await ctx.reply(
+      '🔐 *Avval tizimga kiring!*\n\n/login yoki /start buyrug\'ini bosing.',
+      { parse_mode: 'Markdown', ...loginMenu }
+    );
+  }
 });
 
 // ========== Launch ==========
@@ -519,7 +581,9 @@ bot.launch();
 console.log('✅ Edu Manager bot ishga tushdi...');
 console.log(`🤖 Bot token: ${BOT_TOKEN.slice(0, 10)}...`);
 console.log(`👑 Admin ID: ${process.env.ADMIN_IDS || 'sozlanmagan'}`);
-console.log(`🌐 Mini App URL: ${MINI_APP_URL}`);
+console.log('');
+console.log('📧 Test login: jasur@edumanager.uz / 12345678');
+console.log('👤 Test login: admin / admin123');
 
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
