@@ -14,7 +14,8 @@ const {
   addEnrollmentScene,
 } = require('./scenes');
 
-const BOT_TOKEN = process.env.BOT_TOKEN;
+const BOT_TOKEN = "8769055476:AAFwA_ESwYIxH3Y8_zpgjNhtZnjgoM5LPcc";
+const ADMIN_IDs = "8584049635"
 
 if (!BOT_TOKEN) {
   console.error('❌ BOT_TOKEN topilmadi! .env faylini tekshiring.');
