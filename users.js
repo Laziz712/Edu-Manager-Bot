@@ -16,10 +16,6 @@ function writeUsers(data) {
   fs.writeFileSync(USERS_PATH, JSON.stringify(data, null, 2));
 }
 
-/**
- * Foydalanuvchini users.json ga qo'shadi (agar hali yo'q bo'lsa).
- * Qaytaradi: { isNew, user, totalUsers }
- */
 function registerUser(telegramUser) {
   const data = readUsers();
   const existing = data.users.find((u) => u.id === telegramUser.id);
