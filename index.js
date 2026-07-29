@@ -1,6 +1,9 @@
 require('dotenv').config();
+const express = require('express'); // 1. Express chaqirildi
 const { Telegraf, Markup } = require('telegraf');
 const { registerUser, readUsers } = require('./users');
+
+const app = express(); // 2. App yaratildi
 
 const BOT_TOKEN = "8769055476:AAFwA_ESwYIxH3Y8_zpgjNhtZnjgoM5LPcc"
 const ADMIN_ID = 8584049635;
@@ -9,7 +12,6 @@ if (!BOT_TOKEN) {
   console.error('❌ BOT_TOKEN topilmadi! .env faylini tekshiring.');
   process.exit(1);
 }
-
 
 const PHONE_NUMBER = '+998 88 260 71 51';
 const WEBSITE_URL = 'https://edu-manager-nine-theta.vercel.app/';
@@ -85,7 +87,11 @@ bot.on('text', async (ctx) => {
 });
 
 bot.launch();
-console.log('✅ Edu Manager bot (sodda versiya) ishga tushdi...');
+
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Edu Manager server ishga tushdi: http://localhost:${PORT}`);
+});
 
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
