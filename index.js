@@ -1,9 +1,9 @@
 require('dotenv').config();
-const express = require('express'); // 1. Express chaqirildi
+const express = require('express');
 const { Telegraf, Markup } = require('telegraf');
 const { registerUser, readUsers } = require('./users');
 
-const app = express(); // 2. App yaratildi
+const app = express();
 
 const BOT_TOKEN = "8769055476:AAFwA_ESwYIxH3Y8_zpgjNhtZnjgoM5LPcc"
 const ADMIN_ID = 8584049635;
