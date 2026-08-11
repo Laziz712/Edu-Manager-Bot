@@ -27,9 +27,9 @@ const ABOUT_TEXT =
   "marketing va boshqa zamonaviy kasblarni kichik guruhlarda, tajribali ustozlar bilan o'rgatamiz.";
  
 const CONTACT_TEXT =
-  "📍 Manzil: Urganch sh., Al-Xorazmiy ko'chasi, 12-uy\n" +
-  "📞 Telefon: +998 90 123 45 67\n" +
-  "🕒 Ish vaqti: Har kuni 09:00 – 20:00\n" +
+  "📍 Manzil: Xiva Shahar, Al-Xorazmiy ko'chasi, 12-uy\n" +
+  "📞 Telefon: +998 88 260 71 51\n" +
+  "🕒 Ish vaqti: Har kuni 09:00 – 18:00\n" +
   `🌐 Sayt: ${SITE_URL}`;
  
 if (!BOT_TOKEN) {
