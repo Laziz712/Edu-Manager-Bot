@@ -31,7 +31,7 @@ if (!BOT_TOKEN) {
   console.warn('⚠️ TELEGRAM_BOT_TOKEN topilmadi — bot ishga tushmaydi. .env faylini tekshiring.');
 }
 
-const bot = BOT_TOKEN ? new TelegramBot(BOT_TOKEN) : null;
+const bot = BOT_TOKEN ? new TelegramBot(BOT_TOKEN, { polling: true }) : null;
 
 const sessions = new Map();
 function getSession(chatId) {
