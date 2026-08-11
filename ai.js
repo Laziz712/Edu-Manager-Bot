@@ -1,7 +1,7 @@
 const AI_API_KEY = process.env.ANTHROPIC_API_KEY;
 
 /**
- * Claude orqali savolga javob oladi.
+ * AI yordamchi bilan suhbatlashish
  * @param {Object} params
  * @param {string} params.message - foydalanuvchi savoli
  * @param {Array}  params.history - oldingi xabarlar [{role:'user'|'assistant', content:string}]

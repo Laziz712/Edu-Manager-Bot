@@ -16,10 +16,7 @@ function writeUsers(data) {
   fs.writeFileSync(USERS_PATH, JSON.stringify(data, null, 2));
 }
 
-/**
- * Foydalanuvchini users.json ga qo'shadi (email bo'yicha, agar hali yo'q bo'lsa).
- * Qaytaradi: { isNew, user, totalUsers }
- */
+
 function registerSiteUser({ name, email, phone, registeredVia }) {
   const data = readUsers();
   const existing = data.users.find((u) => u.email === email);
@@ -45,11 +42,6 @@ function registerSiteUser({ name, email, phone, registeredVia }) {
   return { isNew: true, user: newUser, totalUsers: data.totalUsers };
 }
 
-/**
- * Telegram bot orqali ariza qoldirgan foydalanuvchini users.json ga qo'shadi
- * (chatId bo'yicha, agar hali yo'q bo'lsa — bo'lsa ma'lumotini yangilaydi).
- * Qaytaradi: { isNew, user, totalUsers }
- */
 function registerTelegramUser({ chatId, name, phone, courseName }) {
   const data = readUsers();
   const existing = data.users.find((u) => u.telegramChatId === chatId);

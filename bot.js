@@ -6,7 +6,6 @@ const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const ADMIN_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 const SITE_URL = process.env.SITE_URL || 'https://edu-manager-nine-theta.vercel.app';
 
-// Saytdagi kurslar bilan bir xil ro'yxat — narx/o'qituvchi o'zgarsa shu yerni yangilang
 const COURSES = [
   { name: 'Frontend Dasturlash', price: '900 000', teacher: 'Botir Rustamov' },
   { name: 'Grafik Dizayn', price: '700 000', teacher: 'Malika Yusupova' },
@@ -31,11 +30,9 @@ if (!BOT_TOKEN) {
   console.warn('⚠️ TELEGRAM_BOT_TOKEN topilmadi — bot ishga tushmaydi. .env faylini tekshiring.');
 }
 
-// polling YO'Q — Vercel kabi serverless muhitda ishlashi uchun webhook orqali update olamiz
 const bot = BOT_TOKEN ? new TelegramBot(BOT_TOKEN) : null;
 
-// Har bir foydalanuvchining joriy holati (AI suhbatda, ro'yxatdan o'tish bosqichida va h.k.)
-// Eslatma: xotirada saqlanadi — server qayta ishga tushsa tozalanadi, MVP uchun yetarli.
+
 const sessions = new Map();
 function getSession(chatId) {
   if (!sessions.has(chatId)) sessions.set(chatId, { mode: 'idle' });
@@ -51,7 +48,6 @@ function safeSend(chatId, text, opts) {
   });
 }
 
-/* ================= MENYULAR ================= */
 function mainMenuKeyboard() {
   return {
     inline_keyboard: [
@@ -90,7 +86,6 @@ function coursesListText() {
   );
 }
 
-/* ================= RO'YXATDAN O'TISH OQIMI ================= */
 async function startRegister(chatId) {
   sessions.set(chatId, { mode: 'register', step: 'name', data: {} });
   await safeSend(chatId, "Ismingizni kiriting:", {
@@ -161,7 +156,6 @@ async function finishRegister(chatId, courseIndex) {
   resetSession(chatId);
 }
 
-/* ================= AI YORDAMCHI OQIMI ================= */
 async function startAiMode(chatId) {
   sessions.set(chatId, { mode: 'ai', history: [] });
   await safeSend(
@@ -193,7 +187,6 @@ async function handleAiMessage(chatId, text) {
   await safeSend(chatId, result.reply, { reply_markup: backToMenuKeyboard() });
 }
 
-/* ================= UPDATE ISHLOVCHILAR (webhook orqali chaqiriladi) ================= */
 function registerHandlers() {
   bot.on('message', async (msg) => {
     const chatId = msg.chat.id;
