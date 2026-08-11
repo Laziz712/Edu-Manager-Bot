@@ -2,8 +2,8 @@ const TelegramBot = require('node-telegram-bot-api');
 const { askAI } = require('./ai');
 const { registerTelegramUser } = require('./users');
 
-const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const ADMIN_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
+const BOT_TOKEN = process.env.BOT_TOKEN;
+const ADMIN_CHAT_ID = process.env.ADMIN_ID;
 const SITE_URL = process.env.SITE_URL || 'https://edu-manager-nine-theta.vercel.app';
 
 const COURSES = [
