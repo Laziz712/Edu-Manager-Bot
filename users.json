@@ -5,12 +5,23 @@
       "name": "Laziz",
       "email": null,
       "phone": "+998 88 260 71 51",
-      "courseName": "Frontend Dasturlash",
+      "courseName": "Videografiya va Mobilografiya",
       "source": "telegram",
       "telegramChatId": 8932939914,
       "registeredVia": "telegram",
       "joinedAt": "2026-08-11T11:06:18.243Z"
+    },
+    {
+      "id": "tg_1786447386751",
+      "name": "Laziz",
+      "email": null,
+      "phone": "+998 88 260 71 51",
+      "courseName": "Frontend Dasturlash",
+      "source": "telegram",
+      "telegramChatId": 8584049635,
+      "registeredVia": "telegram",
+      "joinedAt": "2026-08-11T11:23:06.751Z"
     }
   ],
-  "totalUsers": 1
+  "totalUsers": 2
 }
