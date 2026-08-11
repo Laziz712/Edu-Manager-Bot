@@ -2,8 +2,8 @@ const TelegramBot = require('node-telegram-bot-api');
 const { askAI } = require('./ai');
 const { registerTelegramUser } = require('./users');
 
-const BOT_TOKEN = process.env.BOT_TOKEN;
-const ADMIN_CHAT_ID = process.env.ADMIN_ID;
+const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const ADMIN_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 const SITE_URL = process.env.SITE_URL || 'https://edu-manager-nine-theta.vercel.app';
 
 const COURSES = [
@@ -17,7 +17,7 @@ const COURSES = [
 
 const ABOUT_TEXT =
   "🎓 *Edu Manager* — Xorazm viloyatidagi IT va zamonaviy kasblar o'quv markazi.\n\n" +
-  "2026-yildan buyon amaliyotga yo'naltirilgan ta'lim beramiz: dasturlash, dizayn, " +
+  "2016-yildan buyon amaliyotga yo'naltirilgan ta'lim beramiz: dasturlash, dizayn, " +
   "marketing va boshqa zamonaviy kasblarni kichik guruhlarda, tajribali ustozlar bilan o'rgatamiz.";
 
 const CONTACT_TEXT =
@@ -31,7 +31,6 @@ if (!BOT_TOKEN) {
 }
 
 const bot = BOT_TOKEN ? new TelegramBot(BOT_TOKEN) : null;
-
 
 const sessions = new Map();
 function getSession(chatId) {
