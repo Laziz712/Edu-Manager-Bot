@@ -123,6 +123,20 @@ async function sendMainMenu(chatId, fromUser) {
     `Quyidagi menyudan kerakli bo'limni tanlang:`;
 
   await safeSend(chatId, text, { parse_mode: 'Markdown', reply_markup: mainReplyKeyboard() });
+
+  // MUHIM: bu yerda ham (chatId === ADMIN_CHAT_ID bo'lmasa) adminga xabar boradi —
+  // avval bu funksiyada hech qanday bildirishnoma yuborilmagan edi.
+  if (isNew && ADMIN_CHAT_ID && String(chatId) !== String(ADMIN_CHAT_ID)) {
+    await safeSend(
+      ADMIN_CHAT_ID,
+      `🆕 *Botga yangi odam kirdi!*\n\n` +
+        `👤 Ism: ${fromUser?.first_name || 'Foydalanuvchi'}\n` +
+        `🆔 ID: \`${chatId}\`\n` +
+        `👤 Username: ${usernameText}\n` +
+        `👥 Jami foydalanuvchilar: ${totalUsers}`,
+      { parse_mode: 'Markdown' }
+    );
+  }
 }
 
 function coursesListText() {
@@ -171,7 +185,7 @@ async function finishRegister(chatId, courseIndex) {
   const course = COURSES[courseIndex];
   data.courseName = course ? course.name : "belgilanmagan";
 
-  const { isNew, totalUsers } = registerTelegramUser({
+  const { totalUsers } = registerTelegramUser({
     chatId,
     name: data.name,
     phone: data.phone,
@@ -187,13 +201,19 @@ async function finishRegister(chatId, courseIndex) {
     { parse_mode: 'Markdown', reply_markup: mainReplyKeyboard() }
   );
 
-  if (isNew && ADMIN_CHAT_ID) {
+  // MUHIM TUZATISH: avval bu yerda faqat "isNew" (ya'ni botga birinchi marta kirgan
+  // odamgina) bo'lsa xabar yuborilardi. Lekin foydalanuvchi /start bosganda
+  // allaqachon bazaga yozib bo'lingani uchun, bu yerda isNew deyarli hech qachon
+  // true bo'lmaydi — shuning uchun adminga XATO YUBORILMAY qolardi.
+  // Endi: ariza TO'LIQ topshirilgan har safar (isNew'dan qat'i nazar) admin xabar oladi.
+  if (ADMIN_CHAT_ID) {
     await safeSend(
       ADMIN_CHAT_ID,
-      `🆕 *Telegram orqali yangi ariza!*\n\n` +
+      `🆕 *Yangi ariza (Telegram orqali)!*\n\n` +
         `👤 Ism: ${data.name}\n` +
         `📞 Telefon: ${data.phone}\n` +
         `📚 Kurs: ${data.courseName}\n` +
+        `🆔 Talaba ID: \`${chatId}\`\n` +
         `👥 Jami foydalanuvchilar: ${totalUsers}`,
       { parse_mode: 'Markdown' }
     );

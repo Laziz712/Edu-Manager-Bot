@@ -49,7 +49,7 @@ async function askAI({ message, history = [], context = {} }) {
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-1.5-flash',
+      model: 'gemini-3.6-flash',
       contents: [
         ...formattedHistory,
         { role: 'user', parts: [{ text: message }] }
@@ -63,8 +63,8 @@ async function askAI({ message, history = [], context = {} }) {
     const reply = response.text ? response.text.trim() : '';
     return { reply: reply || 'Kechirasiz, javob ololmadim.' };
   } catch (e) {
-    console.error('Gemini AI chat xatolik:', e.message || e);
-    return { error: 'Server xatoligi yuz berdi.' };
+    console.error('Gemini AI chat xatolik:', e?.message || e, e?.status ? `(status: ${e.status})` : '');
+    return { error: 'Server xatoligi yuz berdi. (Batafsil: konsoldagi log-ni tekshiring)' };
   }
 }
 
