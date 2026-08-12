@@ -28,54 +28,54 @@ function registerSiteUser({ name, email, phone, registeredVia }) {
     return { isNew: false, user: existing, totalUsers: data.totalUsers };
   }
 
-  const newUser = {
-    id: 'site_' + Date.now(),
-    name,
-    email,
-    phone: phone || null,
-    source: 'website',
-    registeredVia: registeredVia || 'email',
-    joinedAt: new Date().toISOString(),
-  };
+  // const newUser = {
+  //   id: 'site_' + Date.now(),
+  //   name,
+  //   email,
+  //   phone: phone || null,
+  //   source: 'website',
+  //   registeredVia: registeredVia || 'email',
+  //   joinedAt: new Date().toISOString(),
+  // };
 
-  data.users.push(newUser);
-  data.totalUsers = data.users.length;
-  writeUsers(data);
+  // data.users.push(newUser);
+  // data.totalUsers = data.users.length;
+  // writeUsers(data);
 
-  return { isNew: true, user: newUser, totalUsers: data.totalUsers };
+  // return { isNew: true, user: newUser, totalUsers: data.totalUsers };
 }
 
 function registerTelegramUser({ chatId, name, phone, courseName, username, firstName }) {
   const data = readUsers();
   const existing = data.users.find((u) => u.telegramChatId === chatId);
 
-  if (existing) {
-    existing.name = name || existing.name || firstName || 'Foydalanuvchi';
-    existing.phone = phone || existing.phone;
-    existing.courseName = courseName || existing.courseName;
-    if (username) existing.username = username;
-    writeUsers(data);
-    return { isNew: false, user: existing, totalUsers: data.totalUsers };
-  }
+  // if (existing) {
+  //   existing.name = name || existing.name || firstName || 'Foydalanuvchi';
+  //   existing.phone = phone || existing.phone;
+  //   existing.courseName = courseName || existing.courseName;
+  //   if (username) existing.username = username;
+  //   writeUsers(data);
+  //   return { isNew: false, user: existing, totalUsers: data.totalUsers };
+  // }
 
-  const newUser = {
-    id: 'tg_' + Date.now(),
-    name: name || firstName || 'Foydalanuvchi',
-    email: null,
-    phone: phone || null,
-    courseName: courseName || null,
-    source: 'telegram',
-    telegramChatId: chatId,
-    username: username || null,
-    registeredVia: 'telegram',
-    joinedAt: new Date().toISOString(),
-  };
+  // const newUser = {
+  //   id: 'tg_' + Date.now(),
+  //   name: name || firstName || 'Foydalanuvchi',
+  //   email: null,
+  //   phone: phone || null,
+  //   courseName: courseName || null,
+  //   source: 'telegram',
+  //   telegramChatId: chatId,
+  //   username: username || null,
+  //   registeredVia: 'telegram',
+  //   joinedAt: new Date().toISOString(),
+  // };
 
-  data.users.push(newUser);
-  data.totalUsers = data.users.length;
-  writeUsers(data);
+  // data.users.push(newUser);
+  // data.totalUsers = data.users.length;
+  // writeUsers(data);
 
-  return { isNew: true, user: newUser, totalUsers: data.totalUsers };
+  // return { isNew: true, user: newUser, totalUsers: data.totalUsers };
 }
 
 module.exports = { readUsers, writeUsers, registerSiteUser, registerTelegramUser };
