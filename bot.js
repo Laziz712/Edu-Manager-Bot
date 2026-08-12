@@ -7,7 +7,6 @@ const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const ADMIN_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 const SITE_URL = process.env.SITE_URL || 'https://edu-manager-nine-theta.vercel.app';
 
-// Local test qilmoqchi bo'lsangiz: USE_POLLING=true qilib .env ga qo'shing.
 const USE_POLLING = process.env.USE_POLLING === 'true';
 
 const COURSES = [
@@ -206,7 +205,7 @@ async function finishRegister(chatId, courseIndex) {
   // allaqachon bazaga yozib bo'lingani uchun, bu yerda isNew deyarli hech qachon
   // true bo'lmaydi — shuning uchun adminga XATO YUBORILMAY qolardi.
   // Endi: ariza TO'LIQ topshirilgan har safar (isNew'dan qat'i nazar) admin xabar oladi.
-  if (ADMIN_CHAT_ID) {
+  if (ADMIN_CHAT_ID && String(chatId) !== String(ADMIN_CHAT_ID)) {
     await safeSend(
       ADMIN_CHAT_ID,
       `🆕 *Yangi ariza (Telegram orqali)!*\n\n` +

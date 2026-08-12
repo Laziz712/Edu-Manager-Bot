@@ -96,7 +96,23 @@ app.get('/api/users', (req, res) => {
   res.json(readUsers());
 });
 
-// 5. Telegram Webhook tugun-nuqtasi (Vercel / Production uchun)
+// 5. Webhook'ni qo'lda qayta o'rnatish (local'da USE_POLLING bilan test qilgandan
+// keyin Render'ni qayta deploy qilmasdan tez tuzatish uchun)
+app.post('/api/reset-webhook', async (req, res) => {
+  if (ADMIN_KEY && req.headers['x-admin-key'] !== ADMIN_KEY) {
+    return res.status(401).json({ error: "Ruxsat yo'q." });
+  }
+  if (!bot) return res.status(503).json({ error: 'Bot sozlanmagan.' });
+  const webhookUrl = `${process.env.SITE_URL || 'https://edu-manager-nine-theta.vercel.app'}/api/telegram-webhook`;
+  try {
+    await bot.setWebHook(webhookUrl);
+    res.json({ ok: true, webhookUrl });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+ 
+// 6. Telegram Webhook tugun-nuqtasi (Vercel / Production uchun)
 app.post('/api/telegram-webhook', (req, res) => {
   try {
     if (bot) {
@@ -109,6 +125,24 @@ app.post('/api/telegram-webhook', (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`✅ Edu Manager server ishga tushdi: http://localhost:${PORT}`);
+
+  // MUHIM: node-telegram-bot-api'da polling rejimi (USE_POLLING=true, odatda
+  // local kompyuterda cmd/terminal orqali test qilish uchun) ishga tushganda,
+  // kutubxona Telegram'dagi webhook'ni AVTOMATIK O'CHIRIB TASHLAYDI. Shuning
+  // uchun avval local'da polling bilan test qilib, keyin cmd'ni yopganingizda —
+  // Render'dagi webhook ham o'chib qolgani uchun bot butunlay ishlamay qoladi.
+  // Buning oldini olish uchun: agar hozir polling rejimida ishlamayotgan bo'lsak
+  // (ya'ni bu — production/Render holati), server ishga tushganda webhook'ni
+  // qayta o'rnatib qo'yamiz.
+  if (bot && process.env.USE_POLLING !== 'true' && BOT_TOKEN) {
+    const webhookUrl = `${process.env.SITE_URL || 'https://edu-manager-nine-theta.vercel.app'}/api/telegram-webhook`;
+    try {
+      await bot.setWebHook(webhookUrl);
+      console.log(`🔗 Telegram webhook o'rnatildi: ${webhookUrl}`);
+    } catch (err) {
+      console.error('⚠️ Telegram webhook o‘rnatishda xatolik:', err.message);
+    }
+  }
 });

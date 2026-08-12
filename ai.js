@@ -1,5 +1,4 @@
 const { GoogleGenAI } = require('@google/genai');
-
 const AI_API_KEY = process.env.GEMINI_API_KEY;
 const ai = AI_API_KEY ? new GoogleGenAI({ apiKey: AI_API_KEY }) : null;
 
@@ -56,7 +55,14 @@ async function askAI({ message, history = [], context = {} }) {
       ],
       config: {
         systemInstruction: systemPrompt,
-        maxOutputTokens: 1024,
+        maxOutputTokens: 2048,
+        // Gemini flash modellarida "thinking" standart yoqilgan bo'ladi va u
+        // maxOutputTokens hisobidan token sarflaydi. Agar buni o'chirmasak,
+        // "thinking" ko'p token yeb qo'yib, asosiy javob yarim yo'lda kesilib
+        // qolishi mumkin edi (aynan shu sabab AI javobi o'rtada tashlab ketardi).
+        thinkingConfig: {
+          thinkingBudget: 0,
+        },
       }
     });
 
