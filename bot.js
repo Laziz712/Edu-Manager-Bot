@@ -306,4 +306,4 @@ function registerHandlers() {
 
 if (bot) registerHandlers();
 
-module.exports = { bot };
+module.exports = { bot }; 
