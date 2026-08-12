@@ -3,79 +3,314 @@ const path = require('path');
 
 const USERS_PATH = path.join(__dirname, 'users.json');
 
-function readUsers() {
-  if (!fs.existsSync(USERS_PATH)) {
-    const initial = { users: [], totalUsers: 0 };
-    fs.writeFileSync(USERS_PATH, JSON.stringify(initial, null, 2));
-    return initial;
+const EMPTY_DB = {
+  users: [],
+  totalUsers: 0
+};
+
+function normalizeData(data) {
+  if (!data || typeof data !== 'object') {
+    return {
+      users: [],
+      totalUsers: 0
+    };
   }
+
+  if (!Array.isArray(data.users)) {
+    data.users = [];
+  }
+
+  data.totalUsers = data.users.length;
+
+  return data;
+}
+
+function readUsers() {
   try {
-    return JSON.parse(fs.readFileSync(USERS_PATH, 'utf-8'));
-  } catch (err) {
-    return { users: [], totalUsers: 0 };
+    if (!fs.existsSync(USERS_PATH)) {
+      const initial = {
+        users: [],
+        totalUsers: 0
+      };
+
+      writeUsers(initial);
+      return initial;
+    }
+
+    const raw = fs.readFileSync(USERS_PATH, 'utf8');
+
+    if (!raw.trim()) {
+      return {
+        users: [],
+        totalUsers: 0
+      };
+    }
+
+    const data = JSON.parse(raw);
+
+    return normalizeData(data);
+  } catch (error) {
+    console.error(
+      "❌ users.json o'qishda xatolik:",
+      error.message
+    );
+
+    return {
+      users: [],
+      totalUsers: 0
+    };
   }
 }
 
 function writeUsers(data) {
-  fs.writeFileSync(USERS_PATH, JSON.stringify(data, null, 2));
+  const normalized = normalizeData(data);
+
+  try {
+    fs.writeFileSync(
+      USERS_PATH,
+      JSON.stringify(normalized, null, 2),
+      'utf8'
+    );
+
+    return normalized;
+  } catch (error) {
+    console.error(
+      "❌ users.json yozishda xatolik:",
+      error.message
+    );
+
+    throw error;
+  }
 }
 
-function registerSiteUser({ name, email, phone, registeredVia }) {
-  const data = readUsers();
-  const existing = data.users.find((u) => u.email === email);
-
-  if (existing) {
-    return { isNew: false, user: existing, totalUsers: data.totalUsers };
+function clean(value) {
+  if (typeof value !== 'string') {
+    return value;
   }
 
-  // const newUser = {
-  //   id: 'site_' + Date.now(),
-  //   name,
-  //   email,
-  //   phone: phone || null,
-  //   source: 'website',
-  //   registeredVia: registeredVia || 'email',
-  //   joinedAt: new Date().toISOString(),
-  // };
-
-  // data.users.push(newUser);
-  // data.totalUsers = data.users.length;
-  // writeUsers(data);
-
-  // return { isNew: true, user: newUser, totalUsers: data.totalUsers };
+  return value.trim();
 }
 
-function registerTelegramUser({ chatId, name, phone, courseName, username, firstName }) {
+/* =========================
+   SAYT FOYDALANUVCHISI
+========================= */
+
+function registerSiteUser({
+  name,
+  email,
+  phone,
+  registeredVia
+} = {}) {
   const data = readUsers();
-  const existing = data.users.find((u) => u.telegramChatId === chatId);
 
-  // if (existing) {
-  //   existing.name = name || existing.name || firstName || 'Foydalanuvchi';
-  //   existing.phone = phone || existing.phone;
-  //   existing.courseName = courseName || existing.courseName;
-  //   if (username) existing.username = username;
-  //   writeUsers(data);
-  //   return { isNew: false, user: existing, totalUsers: data.totalUsers };
-  // }
+  const cleanName = clean(name);
+  const cleanEmail = clean(email)?.toLowerCase();
+  const cleanPhone = clean(phone);
 
-  // const newUser = {
-  //   id: 'tg_' + Date.now(),
-  //   name: name || firstName || 'Foydalanuvchi',
-  //   email: null,
-  //   phone: phone || null,
-  //   courseName: courseName || null,
-  //   source: 'telegram',
-  //   telegramChatId: chatId,
-  //   username: username || null,
-  //   registeredVia: 'telegram',
-  //   joinedAt: new Date().toISOString(),
-  // };
+  if (!cleanName || !cleanEmail) {
+    throw new Error(
+      "Ism va email majburiy."
+    );
+  }
 
-  // data.users.push(newUser);
-  // data.totalUsers = data.users.length;
-  // writeUsers(data);
+  const existing = data.users.find(
+    (user) =>
+      user.source === 'website' &&
+      typeof user.email === 'string' &&
+      user.email.toLowerCase() === cleanEmail
+  );
 
-  // return { isNew: true, user: newUser, totalUsers: data.totalUsers };
+  if (existing) {
+    existing.name = cleanName;
+
+    if (cleanPhone) {
+      existing.phone = cleanPhone;
+    }
+
+    if (registeredVia) {
+      existing.registeredVia = registeredVia;
+    }
+
+    writeUsers(data);
+
+    return {
+      isNew: false,
+      user: existing,
+      totalUsers: data.users.length
+    };
+  }
+
+  const newUser = {
+    id:
+      'site_' +
+      Date.now() +
+      '_' +
+      Math.random()
+        .toString(36)
+        .slice(2, 8),
+
+    name: cleanName,
+
+    email: cleanEmail,
+
+    phone: cleanPhone || null,
+
+    source: 'website',
+
+    registeredVia:
+      registeredVia || 'email',
+
+    joinedAt:
+      new Date().toISOString()
+  };
+
+  data.users.push(newUser);
+
+  writeUsers(data);
+
+  return {
+    isNew: true,
+    user: newUser,
+    totalUsers: data.users.length
+  };
 }
 
-module.exports = { readUsers, writeUsers, registerSiteUser, registerTelegramUser };
+/* =========================
+   TELEGRAM FOYDALANUVCHISI
+========================= */
+
+function registerTelegramUser({
+  chatId,
+  name,
+  phone,
+  courseName,
+  username,
+  firstName
+} = {}) {
+  const data = readUsers();
+
+  if (
+    chatId === undefined ||
+    chatId === null ||
+    String(chatId).trim() === ''
+  ) {
+    throw new Error(
+      "Telegram chatId majburiy."
+    );
+  }
+
+  const normalizedChatId =
+    String(chatId);
+
+  const cleanName =
+    clean(name);
+
+  const cleanPhone =
+    clean(phone);
+
+  const cleanCourse =
+    clean(courseName);
+
+  const cleanUsername =
+    clean(username)?.replace(/^@/, '');
+
+  const cleanFirstName =
+    clean(firstName);
+
+  /* Mavjud Telegram userni topish */
+
+  const existing = data.users.find(
+    (user) =>
+      user.source === 'telegram' &&
+      String(user.telegramChatId) ===
+        normalizedChatId
+  );
+
+  /* Agar user oldin mavjud bo'lsa */
+
+  if (existing) {
+    existing.name =
+      cleanName ||
+      existing.name ||
+      cleanFirstName ||
+      'Foydalanuvchi';
+
+    if (cleanPhone) {
+      existing.phone = cleanPhone;
+    }
+
+    if (cleanCourse) {
+      existing.courseName =
+        cleanCourse;
+    }
+
+    if (cleanUsername) {
+      existing.username =
+        cleanUsername;
+    }
+
+    writeUsers(data);
+
+    return {
+      isNew: false,
+      user: existing,
+      totalUsers: data.users.length
+    };
+  }
+
+  /* Yangi Telegram user */
+
+  const newUser = {
+    id:
+      'tg_' +
+      Date.now() +
+      '_' +
+      Math.random()
+        .toString(36)
+        .slice(2, 8),
+
+    name:
+      cleanName ||
+      cleanFirstName ||
+      'Foydalanuvchi',
+
+    email: null,
+
+    phone:
+      cleanPhone || null,
+
+    courseName:
+      cleanCourse || null,
+
+    source: 'telegram',
+
+    telegramChatId:
+      normalizedChatId,
+
+    username:
+      cleanUsername || null,
+
+    registeredVia:
+      'telegram',
+
+    joinedAt:
+      new Date().toISOString()
+  };
+
+  data.users.push(newUser);
+
+  writeUsers(data);
+
+  return {
+    isNew: true,
+    user: newUser,
+    totalUsers: data.users.length
+  };
+}
+
+module.exports = {
+  readUsers,
+  writeUsers,
+  registerSiteUser,
+  registerTelegramUser
+};
