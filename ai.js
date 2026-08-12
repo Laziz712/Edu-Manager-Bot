@@ -1,4 +1,7 @@
-const AI_API_KEY = process.env.ANTHROPIC_API_KEY;
+const { GoogleGenAI } = require('@google/genai');
+
+const AI_API_KEY = process.env.GEMINI_API_KEY;
+const ai = AI_API_KEY ? new GoogleGenAI({ apiKey: AI_API_KEY }) : null;
 
 /**
  * AI yordamchi bilan suhbatlashish
@@ -10,11 +13,12 @@ const AI_API_KEY = process.env.ANTHROPIC_API_KEY;
  */
 async function askAI({ message, history = [], context = {} }) {
   if (!message || typeof message !== 'string' || !message.trim()) {
-    return { error: 'Savol matni bo\'sh bo\'lmasligi kerak.' };
+    return { error: "Savol matni bo'sh bo'lmasligi kerak." };
   }
-  if (!AI_API_KEY) {
+
+  if (!ai) {
     return {
-      error: "AI yordamchi hali sozlanmagan. .env fayliga ANTHROPIC_API_KEY qo'shing (https://console.anthropic.com dan olinadi).",
+      error: "AI yordamchi hali sozlanmagan. .env fayliga GEMINI_API_KEY qo'shing (https://aistudio.google.com dan olinadi).",
     };
   }
 
@@ -32,36 +36,34 @@ async function askAI({ message, history = [], context = {} }) {
     (context.userName ? `Suhbatlashayotgan talaba: ${context.userName}. ` : '') +
     `Javoblaringni juda uzun qilma — 150-200 so'zdan oshirma.`;
 
-  const priorMessages = Array.isArray(history)
-    ? history.filter((m) => m && (m.role === 'user' || m.role === 'assistant') && m.content).slice(-10)
+  // Claude 'assistant' rolini Gemini 'model' roliga o'tkazamiz va strukturani to'g'rilaymiz
+  const formattedHistory = Array.isArray(history)
+    ? history
+        .filter((m) => m && (m.role === 'user' || m.role === 'assistant' || m.role === 'model') && m.content)
+        .slice(-10)
+        .map((m) => ({
+          role: m.role === 'assistant' ? 'model' : m.role,
+          parts: [{ text: m.content }],
+        }))
     : [];
 
-  const messages = [...priorMessages, { role: 'user', content: message }];
-
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': AI_API_KEY,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 1024,
-        system: systemPrompt,
-        messages,
-      }),
+    const response = await ai.models.generateContent({
+      model: 'gemini-1.5-flash',
+      contents: [
+        ...formattedHistory,
+        { role: 'user', parts: [{ text: message }] }
+      ],
+      config: {
+        systemInstruction: systemPrompt,
+        maxOutputTokens: 1024,
+      }
     });
-    const data = await res.json();
-    if (!res.ok) {
-      console.error('Anthropic API xatolik:', data);
-      return { error: "AI javob berishda xatolik yuz berdi. Keyinroq urinib ko'ring." };
-    }
-    const reply = (data.content || []).map((b) => b.text || '').join('\n').trim();
+
+    const reply = response.text ? response.text.trim() : '';
     return { reply: reply || 'Kechirasiz, javob ololmadim.' };
   } catch (e) {
-    console.error('AI chat xatolik:', e.message);
+    console.error('Gemini AI chat xatolik:', e.message || e);
     return { error: 'Server xatoligi yuz berdi.' };
   }
 }

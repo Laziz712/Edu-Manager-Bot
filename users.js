@@ -9,13 +9,16 @@ function readUsers() {
     fs.writeFileSync(USERS_PATH, JSON.stringify(initial, null, 2));
     return initial;
   }
-  return JSON.parse(fs.readFileSync(USERS_PATH, 'utf-8'));
+  try {
+    return JSON.parse(fs.readFileSync(USERS_PATH, 'utf-8'));
+  } catch (err) {
+    return { users: [], totalUsers: 0 };
+  }
 }
 
 function writeUsers(data) {
   fs.writeFileSync(USERS_PATH, JSON.stringify(data, null, 2));
 }
-
 
 function registerSiteUser({ name, email, phone, registeredVia }) {
   const data = readUsers();
@@ -42,26 +45,28 @@ function registerSiteUser({ name, email, phone, registeredVia }) {
   return { isNew: true, user: newUser, totalUsers: data.totalUsers };
 }
 
-function registerTelegramUser({ chatId, name, phone, courseName }) {
+function registerTelegramUser({ chatId, name, phone, courseName, username, firstName }) {
   const data = readUsers();
   const existing = data.users.find((u) => u.telegramChatId === chatId);
 
   if (existing) {
-    existing.name = name || existing.name;
+    existing.name = name || existing.name || firstName || 'Foydalanuvchi';
     existing.phone = phone || existing.phone;
     existing.courseName = courseName || existing.courseName;
+    if (username) existing.username = username;
     writeUsers(data);
     return { isNew: false, user: existing, totalUsers: data.totalUsers };
   }
 
   const newUser = {
     id: 'tg_' + Date.now(),
-    name,
+    name: name || firstName || 'Foydalanuvchi',
     email: null,
     phone: phone || null,
     courseName: courseName || null,
     source: 'telegram',
     telegramChatId: chatId,
+    username: username || null,
     registeredVia: 'telegram',
     joinedAt: new Date().toISOString(),
   };

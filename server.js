@@ -11,10 +11,11 @@ const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 const ADMIN_KEY = process.env.ADMIN_KEY;
 
 const app = express();
-app.use(express.json());
 
+app.use(express.json());
 app.use(express.static(__dirname));
 
+// Telegram botga bildirishnoma yuborish uchun yordamchi funksiya
 async function sendTelegramMessage(text) {
   if (!BOT_TOKEN || !CHAT_ID) {
     console.warn('⚠️ TELEGRAM_BOT_TOKEN yoki TELEGRAM_CHAT_ID .env da sozlanmagan — xabar yuborilmadi.');
@@ -35,6 +36,7 @@ async function sendTelegramMessage(text) {
   }
 }
 
+// 1. Saytdan foydalanuvchini ro'yxatga olish API
 app.post('/api/register-user', async (req, res) => {
   const { name, email, phone, registeredVia } = req.body || {};
 
@@ -60,6 +62,7 @@ app.post('/api/register-user', async (req, res) => {
   res.json({ isNew, totalUsers });
 });
 
+// 2. Telegramga xabar yuborish API
 app.post('/api/notify', async (req, res) => {
   const { text } = req.body || {};
   if (!text) return res.status(400).json({ error: 'text majburiy.' });
@@ -67,16 +70,25 @@ app.post('/api/notify', async (req, res) => {
   res.json({ sent });
 });
 
+// 3. AI Chat API (Gemini orqali)
 app.post('/api/ai-chat', async (req, res) => {
-  const { message, history, context } = req.body || {};
-  const result = await askAI({ message, history, context });
-  if (result.error) {
-    const status = /sozlanmagan/.test(result.error) ? 503 : 502;
-    return res.status(status).json({ error: result.error });
+  try {
+    const { message, history, context } = req.body || {};
+    const result = await askAI({ message, history, context });
+
+    if (result.error) {
+      const status = /sozlanmagan/.test(result.error) ? 503 : 502;
+      return res.status(status).json({ error: result.error });
+    }
+
+    res.json({ reply: result.reply });
+  } catch (error) {
+    console.error('AI API Route Error:', error);
+    res.status(500).json({ error: 'Serverda kutilmagan xatolik yuz berdi.' });
   }
-  res.json({ reply: result.reply });
 });
 
+// 4. Foydalanuvchilar ro'yxatini olish (Admin uchun)
 app.get('/api/users', (req, res) => {
   if (ADMIN_KEY && req.headers['x-admin-key'] !== ADMIN_KEY) {
     return res.status(401).json({ error: "Ruxsat yo'q." });
@@ -84,9 +96,17 @@ app.get('/api/users', (req, res) => {
   res.json(readUsers());
 });
 
+// 5. Telegram Webhook tugun-nuqtasi (Vercel / Production uchun)
 app.post('/api/telegram-webhook', (req, res) => {
-  if (bot) bot.processUpdate(req.body);
-  res.sendStatus(200);
+  try {
+    if (bot) {
+      bot.processUpdate(req.body);
+    }
+    res.sendStatus(200);
+  } catch (err) {
+    console.error('Webhook processing error:', err.message);
+    res.sendStatus(500);
+  }
 });
 
 app.listen(PORT, () => {
