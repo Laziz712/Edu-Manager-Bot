@@ -2,14 +2,15 @@
   "users": [
     {
       "id": "tg_1786446378243",
-      "name": "Laziz",
+      "name": "Arslonn",
       "email": null,
-      "phone": "+998 88 260 71 51",
-      "courseName": "Videografiya va Mobilografiya",
+      "phone": "+998 88 260 71  51",
+      "courseName": "SMM va Marketing",
       "source": "telegram",
       "telegramChatId": 8932939914,
       "registeredVia": "telegram",
-      "joinedAt": "2026-08-11T11:06:18.243Z"
+      "joinedAt": "2026-08-11T11:06:18.243Z",
+      "username": "shavkatovlaziz712"
     },
     {
       "id": "tg_1786447386751",

@@ -267,6 +267,18 @@ function registerHandlers() {
       return;
     }
 
+    if (text === '/myid') {
+      const isAdmin = ADMIN_CHAT_ID && String(chatId) === String(ADMIN_CHAT_ID);
+      await safeSend(
+        chatId,
+        `🆔 Sizning Telegram ID'ingiz: \`${chatId}\`\n\n` +
+          `⚙️ Serverdagi ADMIN_CHAT_ID: \`${ADMIN_CHAT_ID || "sozlanmagan"}\`\n` +
+          `${isAdmin ? '✅ Siz admin sifatida tanilyapsiz.' : "❌ Siz admin emassiz — agar bo'lishingiz kerak bo'lsa, Render'dagi TELEGRAM_CHAT_ID ni shu ID'ga o'zgartiring."}`,
+        { parse_mode: 'Markdown' }
+      );
+      return;
+    }
+
     // Menyu tugmalari
     if (text === BTN_COURSES) {
       resetSession(chatId);
