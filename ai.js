@@ -48,17 +48,13 @@ async function askAI({ message, history = [], context = {} }) {
     : [];
 
   try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.6-flash',
-      contents: [
-        ...formattedHistory,
-        { role: 'user', parts: [{ text: message }] }
-      ],
-      config: {
-        systemInstruction: systemPrompt,
-        maxOutputTokens: 1024,
-      }
-    });
+  const response = await ai.models.generateContent({
+    model: 'gemini-3.6-flash',
+    contents: [
+      ...formattedHistory,
+      { role: 'user', parts: [{ text: message }] }
+    ],
+  });
 
     const reply = response.text ? response.text.trim() : '';
     return { reply: reply || 'Kechirasiz, javob ololmadim.' };
