@@ -7,6 +7,7 @@ const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const ADMIN_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 const SITE_URL = process.env.SITE_URL || 'https://edu-manager-nine-theta.vercel.app';
 
+// Local test qilmoqchi bo'lsangiz: USE_POLLING=true qilib .env ga qo'shing.
 const USE_POLLING = process.env.USE_POLLING === 'true';
 
 const COURSES = [
@@ -337,4 +338,4 @@ function registerHandlers() {
 
 if (bot) registerHandlers();
 
-module.exports = { bot }; 
+module.exports = { bot };
