@@ -106,27 +106,25 @@ async function sendMainMenu(chatId, fromUser) {
   resetSession(chatId);
 
   // Foydalanuvchi ma'lumotlarini JSON bazaga saqlash hamda statistika olish
-  const { user, isNew, totalUsers } = registerTelegramUser({
+  const { isNew, totalUsers } = registerTelegramUser({
     chatId: chatId,
     firstName: fromUser?.first_name,
     username: fromUser?.username,
   });
 
-  const usernameText = fromUser?.username ? `@${fromUser.username}` : 'Mavjud emas';
-
+  // MUHIM TUZATISH: bu xabar HAR BIR foydalanuvchiga ko'rinadi, shuning uchun
+  // ichida ID, username yoki "jami foydalanuvchilar" kabi ichki/admin ma'lumot
+  // bo'lmasligi kerak — bular pastda faqat ADMIN_CHAT_ID'ga alohida yuboriladi.
   const text =
     `Assalomu alaykum, *${fromUser?.first_name || 'Foydalanuvchi'}*! 👋\n` +
     `*Edu Manager* botiga xush kelibsiz.\n\n` +
-    `🆔 *Sizning ID:* \`${chatId}\`\n` +
-    `👤 *Username:* ${usernameText}\n` +
-    `👥 *Jami bot foydalanuvchilari:* ${totalUsers} ta\n\n` +
     `Quyidagi menyudan kerakli bo'limni tanlang:`;
 
   await safeSend(chatId, text, { parse_mode: 'Markdown', reply_markup: mainReplyKeyboard() });
 
-  // MUHIM: bu yerda ham (chatId === ADMIN_CHAT_ID bo'lmasa) adminga xabar boradi —
-  // avval bu funksiyada hech qanday bildirishnoma yuborilmagan edi.
+  // Faqat YANGI foydalanuvchi haqida, faqat ADMIN'ga (o'ziga emas) xabar boradi.
   if (isNew && ADMIN_CHAT_ID && String(chatId) !== String(ADMIN_CHAT_ID)) {
+    const usernameText = fromUser?.username ? `@${fromUser.username}` : 'Mavjud emas';
     await safeSend(
       ADMIN_CHAT_ID,
       `🆕 *Botga yangi odam kirdi!*\n\n` +
