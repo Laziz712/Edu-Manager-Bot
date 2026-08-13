@@ -1,0 +1,13 @@
+org: lazizshavkatov712
+app: edu-manager
+service: edu-manager-bot
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+
+functions:
+  api:
+    handler: index.handler
+    events:
+      - httpApi: '*'
