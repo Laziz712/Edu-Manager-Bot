@@ -2,13 +2,14 @@ require('dotenv').config();
 const TelegramBot = require('node-telegram-bot-api');
 const { askAI } = require('./ai');
 const { registerTelegramUser } = require('./users');
+const express = require('express');
+
+const app = express();
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const ADMIN_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 const SITE_URL = process.env.SITE_URL || 'https://edu-manager-nine-theta.vercel.app';
-
-// Local test qilmoqchi bo'lsangiz: USE_POLLING=true qilib .env ga qo'shing.
-const USE_POLLING = process.env.USE_POLLING === 'true';
+const USE_POLLING = process.env.USE_POLLING !== 'false';
 
 const COURSES = [
   { name: 'Frontend Dasturlash', price: '900 000', teacher: 'Botir Rustamov' },
@@ -16,7 +17,7 @@ const COURSES = [
   { name: 'SMM va Marketing', price: '650 000', teacher: 'Diyor Ergashev' },
   { name: 'Videografiya va Mobilografiya', price: '750 000', teacher: 'Sardor Nazarov' },
   { name: 'Buxgalteriya (1C)', price: '600 000', teacher: 'Gulnora Xolova' },
-  { name: "Kids: Robototexnika", price: '450 000', teacher: 'Aziz Karimov' },
+  { name: 'Kids: Robototexnika', price: '450 000', teacher: 'Aziz Karimov' },
 ];
 
 const ABOUT_TEXT =
@@ -34,13 +35,12 @@ if (!BOT_TOKEN) {
   console.warn('⚠️ TELEGRAM_BOT_TOKEN topilmadi — bot ishga tushmaydi. .env faylini tekshiring.');
 }
 
-const bot = BOT_TOKEN ? new TelegramBot(BOT_TOKEN, USE_POLLING ? { polling: true } : {}) : null;
+const bot = BOT_TOKEN ? new TelegramBot(BOT_TOKEN, { polling: USE_POLLING }) : null;
 
 if (bot && USE_POLLING) {
-  console.log('🤖 Bot POLLING rejimida ishga tushdi (local test).');
+  console.log('🤖 Bot POLLING rejimida ishga tushdi.');
 }
 
-// ---- Menyu tugma matnlari (reply keyboard uchun) ----
 const BTN_COURSES = '📚 Kurslar';
 const BTN_AI = '🤖 AI Yordamchi';
 const BTN_REGISTER = "📝 Ro'yxatdan o'tish";
@@ -66,7 +66,6 @@ function safeSend(chatId, text, opts) {
   });
 }
 
-// Doim pastda ko'rinadigan asosiy menyu
 function mainReplyKeyboard() {
   return {
     keyboard: [
@@ -80,7 +79,6 @@ function mainReplyKeyboard() {
   };
 }
 
-// Bekor qilish tugmasi
 function cancelReplyKeyboard() {
   return {
     keyboard: [[BTN_CANCEL]],
@@ -88,8 +86,6 @@ function cancelReplyKeyboard() {
   };
 }
 
-// Telefon raqamini bitta tugma bosish bilan yuborish uchun (Telegram'ning
-// o'zi tasdiqlagan raqamini avtomatik yuboradi)
 function contactRequestKeyboard() {
   return {
     keyboard: [
@@ -100,7 +96,6 @@ function contactRequestKeyboard() {
   };
 }
 
-// Inline keyboard tugmalari
 function coursesInlineKeyboard() {
   return {
     inline_keyboard: COURSES.map((c, i) => [{ text: `📝 ${c.name}ga yozilish`, callback_data: `apply_${i}` }]),
@@ -113,20 +108,24 @@ function regCoursesInlineKeyboard() {
   };
 }
 
-// Asosiy menyu va foydalanuvchi ma'lumotlarini chiqaruvchi funksiya
+function coursesListText() {
+  return (
+    "📚 *Bizning kurslarimiz:*\n\n" +
+    COURSES.map(
+      (c, i) => `${i + 1}. *${c.name}*\n  💵 ${c.price} so'm/oy · 👨‍🏫 ${c.teacher}`
+    ).join('\n\n')
+  );
+}
+
 async function sendMainMenu(chatId, fromUser) {
   resetSession(chatId);
 
-  // Foydalanuvchi ma'lumotlarini JSON bazaga saqlash hamda statistika olish
   const { user, isNew, totalUsers } = registerTelegramUser({
     chatId: chatId,
     firstName: fromUser?.first_name,
     username: fromUser?.username,
   });
 
-  // MUHIM TUZATISH: bu xabar HAR BIR foydalanuvchiga ko'rinadi, shuning uchun
-  // ichida ID, username yoki "jami foydalanuvchilar" kabi ichki/admin ma'lumot
-  // bo'lmasligi kerak — bular pastda faqat ADMIN_CHAT_ID'ga alohida yuboriladi.
   const text =
     `Assalomu alaykum, *${fromUser?.first_name || 'Foydalanuvchi'}*! 👋\n` +
     `*Edu Manager* botiga xush kelibsiz.\n\n` +
@@ -134,7 +133,6 @@ async function sendMainMenu(chatId, fromUser) {
 
   await safeSend(chatId, text, { parse_mode: 'Markdown', reply_markup: mainReplyKeyboard() });
 
-  // Faqat YANGI foydalanuvchi haqida, faqat ADMIN'ga (o'ziga emas) xabar boradi.
   if (isNew && ADMIN_CHAT_ID && String(chatId) !== String(ADMIN_CHAT_ID)) {
     const usernameText = fromUser?.username ? `@${fromUser.username}` : 'Mavjud emas';
     await safeSend(
@@ -149,56 +147,6 @@ async function sendMainMenu(chatId, fromUser) {
   }
 
   return user;
-}
-
-function coursesListText() {
-  return (
-    "📚 *Bizning kurslarimiz:*\n\n" +
-    COURSES.map(
-      (c, i) => `${i + 1}. *${c.name}*\n  💵 ${c.price} so'm/oy · 👨‍🏫 ${c.teacher}`
-    ).join('\n\n')
-  );
-}
-
-async function startRegister(chatId) {
-  sessions.set(chatId, { mode: 'register', step: 'name', data: {} });
-  await safeSend(chatId, "Ismingizni kiriting:", { reply_markup: cancelReplyKeyboard() });
-}
-
-async function handleRegisterStep(chatId, text) {
-  const session = getSession(chatId);
-  const { step, data } = session;
-
-  if (step === 'name') {
-    data.name = text.trim();
-    session.step = 'phone';
-    await safeSend(
-      chatId,
-      "📱 Endi telefon raqamingizni yuboring.\n\nPastdagi *\"Raqamni yuborish\"* tugmasini bosing (yoki raqamni qo'lda yozib yuborishingiz ham mumkin):",
-      { parse_mode: 'Markdown', reply_markup: contactRequestKeyboard() }
-    );
-    return;
-  }
-
-  if (step === 'phone') {
-    // Zaxira variant: agar tugma bosmay, raqamni qo'lda yozib yuborsa ham qabul qilamiz
-    data.phone = text.trim();
-    return advanceAfterPhone(chatId, session);
-  }
-}
-
-// Telefon raqami olingandan keyin davom etish: agar kurs oldindan tanlangan
-// bo'lsa (masalan "kursga yozilish" tugmasi orqali kirilgan bo'lsa) to'g'ridan
-// to'g'ri ro'yxatdan o'tishni yakunlaymiz, aks holda kursni so'raymiz.
-async function advanceAfterPhone(chatId, session) {
-  const { data } = session;
-  if (data.preselectedCourse !== undefined) {
-    return finishRegister(chatId, data.preselectedCourse);
-  }
-  session.step = 'course';
-  await safeSend(chatId, "Qaysi kursga yozilmoqchisiz?", {
-    reply_markup: regCoursesInlineKeyboard(),
-  });
 }
 
 async function finishRegister(chatId, courseIndex) {
@@ -223,11 +171,6 @@ async function finishRegister(chatId, courseIndex) {
     { parse_mode: 'Markdown', reply_markup: mainReplyKeyboard() }
   );
 
-  // MUHIM TUZATISH: avval bu yerda faqat "isNew" (ya'ni botga birinchi marta kirgan
-  // odamgina) bo'lsa xabar yuborilardi. Lekin foydalanuvchi /start bosganda
-  // allaqachon bazaga yozib bo'lingani uchun, bu yerda isNew deyarli hech qachon
-  // true bo'lmaydi — shuning uchun adminga XATO YUBORILMAY qolardi.
-  // Endi: ariza TO'LIQ topshirilgan har safar (isNew'dan qat'i nazar) admin xabar oladi.
   if (ADMIN_CHAT_ID && String(chatId) !== String(ADMIN_CHAT_ID)) {
     await safeSend(
       ADMIN_CHAT_ID,
@@ -242,6 +185,43 @@ async function finishRegister(chatId, courseIndex) {
   }
 
   resetSession(chatId);
+}
+
+async function advanceAfterPhone(chatId, session) {
+  const { data } = session;
+  if (data.preselectedCourse !== undefined) {
+    return finishRegister(chatId, data.preselectedCourse);
+  }
+  session.step = 'course';
+  await safeSend(chatId, "Qaysi kursga yozilmoqchisiz?", {
+    reply_markup: regCoursesInlineKeyboard(),
+  });
+}
+
+async function startRegister(chatId) {
+  sessions.set(chatId, { mode: 'register', step: 'name', data: {} });
+  await safeSend(chatId, "Ismingizni kiriting:", { reply_markup: cancelReplyKeyboard() });
+}
+
+async function handleRegisterStep(chatId, text) {
+  const session = getSession(chatId);
+  const { step, data } = session;
+
+  if (step === 'name') {
+    data.name = text.trim();
+    session.step = 'phone';
+    await safeSend(
+      chatId,
+      "📱 Endi telefon raqamingizni yuboring.\n\nPastdagi *\"Raqamni yuborish\"* tugmasini bosing (yoki raqamni qo'lda yozib yuborishingiz ham mumkin):",
+      { parse_mode: 'Markdown', reply_markup: contactRequestKeyboard() }
+    );
+    return;
+  }
+
+  if (step === 'phone') {
+    data.phone = text.trim();
+    return advanceAfterPhone(chatId, session);
+  }
 }
 
 async function startAiMode(chatId) {
@@ -282,8 +262,6 @@ function registerHandlers() {
   bot.on('message', async (msg) => {
     const chatId = msg.chat.id;
 
-    // "Raqamni yuborish" tugmasi bosilganda Telegram matn emas, alohida
-    // "contact" obyekti yuboradi — buni alohida ushlaymiz.
     if (msg.contact) {
       const session = getSession(chatId);
       if (session.mode === 'register' && session.step === 'phone') {
@@ -299,8 +277,6 @@ function registerHandlers() {
 
     if (text === '/start') {
       const user = await sendMainMenu(chatId, msg.from);
-      // Agar foydalanuvchi hali ro'yxatdan to'liq o'tmagan bo'lsa (telefon
-      // raqami saqlanmagan bo'lsa), darhol ism va raqamni so'raymiz.
       if (!user || !user.phone) {
         await startRegister(chatId);
       }
@@ -319,7 +295,6 @@ function registerHandlers() {
       return;
     }
 
-    // Menyu tugmalari
     if (text === BTN_COURSES) {
       resetSession(chatId);
       return safeSend(chatId, coursesListText(), {
@@ -377,5 +352,14 @@ function registerHandlers() {
 }
 
 if (bot) registerHandlers();
+
+app.get('/', (req, res) => {
+  res.send('Bot 24/7 rejimda muvaffaqiyatli ishlayapti!');
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Express server ${PORT}-portda ishga tushdi`);
+});
 
 module.exports = { bot };
