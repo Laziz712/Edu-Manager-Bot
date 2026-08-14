@@ -88,6 +88,18 @@ function cancelReplyKeyboard() {
   };
 }
 
+// Telefon raqamini bitta tugma bosish bilan yuborish uchun (Telegram'ning
+// o'zi tasdiqlagan raqamini avtomatik yuboradi)
+function contactRequestKeyboard() {
+  return {
+    keyboard: [
+      [{ text: '📱 Raqamni yuborish', request_contact: true }],
+      [BTN_CANCEL],
+    ],
+    resize_keyboard: true,
+  };
+}
+
 // Inline keyboard tugmalari
 function coursesInlineKeyboard() {
   return {
@@ -106,7 +118,7 @@ async function sendMainMenu(chatId, fromUser) {
   resetSession(chatId);
 
   // Foydalanuvchi ma'lumotlarini JSON bazaga saqlash hamda statistika olish
-  const { isNew, totalUsers } = registerTelegramUser({
+  const { user, isNew, totalUsers } = registerTelegramUser({
     chatId: chatId,
     firstName: fromUser?.first_name,
     username: fromUser?.username,
@@ -135,6 +147,8 @@ async function sendMainMenu(chatId, fromUser) {
       { parse_mode: 'Markdown' }
     );
   }
+
+  return user;
 }
 
 function coursesListText() {
@@ -158,23 +172,33 @@ async function handleRegisterStep(chatId, text) {
   if (step === 'name') {
     data.name = text.trim();
     session.step = 'phone';
-    await safeSend(chatId, "Telefon raqamingizni kiriting (masalan: +998 90 123 45 67):", {
-      reply_markup: cancelReplyKeyboard(),
-    });
+    await safeSend(
+      chatId,
+      "📱 Endi telefon raqamingizni yuboring.\n\nPastdagi *\"Raqamni yuborish\"* tugmasini bosing (yoki raqamni qo'lda yozib yuborishingiz ham mumkin):",
+      { parse_mode: 'Markdown', reply_markup: contactRequestKeyboard() }
+    );
     return;
   }
 
   if (step === 'phone') {
+    // Zaxira variant: agar tugma bosmay, raqamni qo'lda yozib yuborsa ham qabul qilamiz
     data.phone = text.trim();
-    if (data.preselectedCourse !== undefined) {
-      return finishRegister(chatId, data.preselectedCourse);
-    }
-    session.step = 'course';
-    await safeSend(chatId, "Qaysi kursga yozilmoqchisiz?", {
-      reply_markup: regCoursesInlineKeyboard(),
-    });
-    return;
+    return advanceAfterPhone(chatId, session);
   }
+}
+
+// Telefon raqami olingandan keyin davom etish: agar kurs oldindan tanlangan
+// bo'lsa (masalan "kursga yozilish" tugmasi orqali kirilgan bo'lsa) to'g'ridan
+// to'g'ri ro'yxatdan o'tishni yakunlaymiz, aks holda kursni so'raymiz.
+async function advanceAfterPhone(chatId, session) {
+  const { data } = session;
+  if (data.preselectedCourse !== undefined) {
+    return finishRegister(chatId, data.preselectedCourse);
+  }
+  session.step = 'course';
+  await safeSend(chatId, "Qaysi kursga yozilmoqchisiz?", {
+    reply_markup: regCoursesInlineKeyboard(),
+  });
 }
 
 async function finishRegister(chatId, courseIndex) {
@@ -257,11 +281,29 @@ function registerHandlers() {
 
   bot.on('message', async (msg) => {
     const chatId = msg.chat.id;
+
+    // "Raqamni yuborish" tugmasi bosilganda Telegram matn emas, alohida
+    // "contact" obyekti yuboradi — buni alohida ushlaymiz.
+    if (msg.contact) {
+      const session = getSession(chatId);
+      if (session.mode === 'register' && session.step === 'phone') {
+        const rawPhone = msg.contact.phone_number || '';
+        session.data.phone = rawPhone.startsWith('+') ? rawPhone : `+${rawPhone}`;
+        await advanceAfterPhone(chatId, session);
+      }
+      return;
+    }
+
     const text = (msg.text || '').trim();
     if (!text) return;
 
     if (text === '/start') {
-      await sendMainMenu(chatId, msg.from);
+      const user = await sendMainMenu(chatId, msg.from);
+      // Agar foydalanuvchi hali ro'yxatdan to'liq o'tmagan bo'lsa (telefon
+      // raqami saqlanmagan bo'lsa), darhol ism va raqamni so'raymiz.
+      if (!user || !user.phone) {
+        await startRegister(chatId);
+      }
       return;
     }
 
