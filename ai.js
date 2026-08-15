@@ -1,5 +1,6 @@
 const { GoogleGenAI } = require('@google/genai');
 
+// .env fayldan kalitni yuklash
 const AI_API_KEY = process.env.GEMINI_API_KEY;
 const ai = AI_API_KEY ? new GoogleGenAI({ apiKey: AI_API_KEY }) : null;
 
@@ -36,7 +37,7 @@ async function askAI({ message, history = [], context = {} }) {
     (context.userName ? `Suhbatlashayotgan talaba: ${context.userName}. ` : '') +
     `Javoblaringni juda uzun qilma — 150-200 so'zdan oshirma.`;
 
-  // Claude 'assistant' rolini Gemini 'model' roliga o'tkazamiz va strukturani to'g'rilaymiz
+  // History strukturasini to'g'rilash
   const formattedHistory = Array.isArray(history)
     ? history
         .filter((m) => m && (m.role === 'user' || m.role === 'assistant' || m.role === 'model') && m.content)
@@ -48,13 +49,16 @@ async function askAI({ message, history = [], context = {} }) {
     : [];
 
   try {
-  const response = await ai.models.generateContent({
-    model: 'gemini-3.6-flash',
-    contents: [
-      ...formattedHistory,
-      { role: 'user', parts: [{ text: message }] }
-    ],
-  });
+    const response = await ai.models.generateContent({
+      model: 'gemini-1.5-flash', // Model nomi to'g'rilandi
+      contents: [
+        ...formattedHistory,
+        { role: 'user', parts: [{ text: message }] }
+      ],
+      config: {
+        systemInstruction: systemPrompt // System prompt config ichiga joylandi
+      }
+    });
 
     const reply = response.text ? response.text.trim() : '';
     return { reply: reply || 'Kechirasiz, javob ololmadim.' };
