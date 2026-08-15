@@ -1,5 +1,6 @@
 require('dotenv').config();
 const { GoogleGenAI } = require('@google/genai');
+
 const AI_API_KEY = process.env.GEMINI_API_KEY;
 const ai = AI_API_KEY ? new GoogleGenAI({ apiKey: AI_API_KEY }) : null;
 
@@ -18,7 +19,7 @@ async function askAI({ message, history = [], context = {} }) {
 
   if (!ai) {
     return {
-      error: "Serverda xatolik yuz berdi. Iltimos, administrator bilan bog'laning.",
+      error: "AI yordamchi hali sozlanmagan. .env fayliga GEMINI_API_KEY qo'shing (https://aistudio.google.com dan olinadi).",
     };
   }
 
@@ -49,13 +50,13 @@ async function askAI({ message, history = [], context = {} }) {
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-1.5-flash', // Model nomi to'g'rilandi
+      model: 'gemini-2.5-flash',
       contents: [
         ...formattedHistory,
         { role: 'user', parts: [{ text: message }] }
       ],
       config: {
-        systemInstruction: systemPrompt // System prompt config ichiga joylandi
+        systemInstruction: systemPrompt
       }
     });
 
