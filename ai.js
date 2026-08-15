@@ -1,6 +1,5 @@
+require('dotenv').config();
 const { GoogleGenAI } = require('@google/genai');
-
-// .env fayldan kalitni yuklash
 const AI_API_KEY = process.env.GEMINI_API_KEY;
 const ai = AI_API_KEY ? new GoogleGenAI({ apiKey: AI_API_KEY }) : null;
 
@@ -19,7 +18,7 @@ async function askAI({ message, history = [], context = {} }) {
 
   if (!ai) {
     return {
-      error: "AI yordamchi hali sozlanmagan. .env fayliga GEMINI_API_KEY qo'shing (https://aistudio.google.com dan olinadi).",
+      error: "Serverda xatolik yuz berdi. Iltimos, administrator bilan bog'laning.",
     };
   }
 
