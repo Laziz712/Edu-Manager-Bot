@@ -2,9 +2,6 @@ require('dotenv').config();
 const TelegramBot = require('node-telegram-bot-api');
 const { askAI } = require('./ai');
 const { registerTelegramUser } = require('./users');
-const express = require('express');
-
-const app = express();
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const ADMIN_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
@@ -352,14 +349,5 @@ function registerHandlers() {
 }
 
 if (bot) registerHandlers();
-
-app.get('/', (req, res) => {
-  res.send('Bot 24/7 rejimda muvaffaqiyatli ishlayapti!');
-});
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Express server ${PORT}-portda ishga tushdi`);
-});
 
 module.exports = { bot };
