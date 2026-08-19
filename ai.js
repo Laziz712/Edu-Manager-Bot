@@ -5,11 +5,42 @@ const AI_API_KEY = process.env.GEMINI_API_KEY;
 const ai = AI_API_KEY ? new GoogleGenAI({ apiKey: AI_API_KEY }) : null;
 
 /**
+ * Markaz haqidagi kontekstdan tizim promptini yasaydi.
+ * context: { userName, courses: [{name,price,teacher}], courseNames, aboutText, contactText }
+ */
+function buildSystemPrompt(context = {}) {
+  let coursesText = "ma'lumot berilmagan";
+
+  if (Array.isArray(context.courses) && context.courses.length) {
+    coursesText = context.courses
+      .map((c) => `- ${c.name} (narxi: ${c.price} so'm/oy, ustoz: ${c.teacher})`)
+      .join('\n');
+  } else if (Array.isArray(context.courseNames) && context.courseNames.length) {
+    coursesText = context.courseNames.join(', ');
+  }
+
+  return (
+    `Sen "Edu Manager" ta'lim markazining rasmiy AI o'qituvchi-yordamchisisan. ` +
+    `Sen ushbu markaz haqida to'liq ma'lumotga egasan va talabalarga faqat shu ma'lumotlar asosida javob berasan.\n\n` +
+    (context.aboutText ? `MARKAZ HAQIDA:\n${context.aboutText}\n\n` : '') +
+    `MAVJUD KURSLAR:\n${coursesText}\n\n` +
+    (context.contactText ? `ALOQA MA'LUMOTLARI:\n${context.contactText}\n\n` : '') +
+    `Qoidalar:\n` +
+    `- Har doim o'zbek tilida, do'stona va sabr bilan javob ber.\n` +
+    `- Kurslar, narxlar yoki ustozlar haqida so'ralsa, faqat yuqoridagi ro'yxatga tayan — o'zingdan kurs yoki narx o'ylab topma.\n` +
+    `- Ro'yxatdan o'tish/yozilish haqida so'rashsa, botdagi "📝 Ro'yxatdan o'tish" tugmasidan foydalanishni tavsiya qil.\n` +
+    `- Agar savol murakkab bo'lsa, misollar bilan sodda qilib tushuntir.\n` +
+    `- Javoblaringni juda uzun qilma — 150-200 so'zdan oshirma.\n` +
+    (context.userName ? `- Suhbatlashayotgan talaba ismi: ${context.userName}.\n` : '')
+  );
+}
+
+/**
  * AI yordamchi bilan suhbatlashish
  * @param {Object} params
  * @param {string} params.message - foydalanuvchi savoli
  * @param {Array}  params.history - oldingi xabarlar [{role:'user'|'assistant', content:string}]
- * @param {Object} params.context - { userName, courseNames: string[] }
+ * @param {Object} params.context - { userName, courses, courseNames, aboutText, contactText }
  * @returns {Promise<{reply?: string, error?: string}>}
  */
 async function askAI({ message, history = [], context = {} }) {
@@ -23,19 +54,7 @@ async function askAI({ message, history = [], context = {} }) {
     };
   }
 
-  const courseNames =
-    Array.isArray(context.courseNames) && context.courseNames.length
-      ? context.courseNames.join(', ')
-      : "ma'lumot berilmagan";
-
-  const systemPrompt =
-    `Sen "Edu Manager" ta'lim markazining AI o'qituvchi-yordamchisisan. ` +
-    `Talabalarga ularning kurslari (${courseNames}) va umuman ta'lim bo'yicha savollariga ` +
-    `tushunarli, qisqa va aniq tarzda javob berasan. ` +
-    `Har doim o'zbek tilida, do'stona va sabr bilan javob ber. ` +
-    `Agar savol murakkab bo'lsa, misollar bilan sodda qilib tushuntir. ` +
-    (context.userName ? `Suhbatlashayotgan talaba: ${context.userName}. ` : '') +
-    `Javoblaringni juda uzun qilma — 150-200 so'zdan oshirma.`;
+  const systemPrompt = buildSystemPrompt(context);
 
   // History strukturasini to'g'rilash
   const formattedHistory = Array.isArray(history)

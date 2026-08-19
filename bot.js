@@ -2,31 +2,17 @@ require('dotenv').config();
 const TelegramBot = require('node-telegram-bot-api');
 const { askAI } = require('./ai');
 const { registerTelegramUser } = require('./users');
+const { COURSES, ABOUT_TEXT, buildContactText } = require('./siteData');
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const ADMIN_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 const SITE_URL = process.env.SITE_URL || 'https://edu-manager-nine-theta.vercel.app';
 const USE_POLLING = process.env.USE_POLLING !== 'false';
+const WEBHOOK_PATH = '/api/telegram-webhook';
+// Webhook uchun asosiy manzil — Render'dagi haqiqiy domenni WEBHOOK_URL orqali berish tavsiya etiladi
+const WEBHOOK_BASE_URL = process.env.WEBHOOK_URL || SITE_URL;
 
-const COURSES = [
-  { name: 'Frontend Dasturlash', price: '900 000', teacher: 'Botir Rustamov' },
-  { name: 'Grafik Dizayn', price: '700 000', teacher: 'Malika Yusupova' },
-  { name: 'SMM va Marketing', price: '650 000', teacher: 'Diyor Ergashev' },
-  { name: 'Videografiya va Mobilografiya', price: '750 000', teacher: 'Sardor Nazarov' },
-  { name: 'Buxgalteriya (1C)', price: '600 000', teacher: 'Gulnora Xolova' },
-  { name: 'Kids: Robototexnika', price: '450 000', teacher: 'Aziz Karimov' },
-];
-
-const ABOUT_TEXT =
-  "🎓 *Edu Manager* — Xorazm viloyatidagi IT va zamonaviy kasblar o'quv markazi.\n\n" +
-  "2026-yildan buyon amaliyotga yo'naltirilgan ta'lim beramiz: dasturlash, dizayn, " +
-  "marketing va boshqa zamonaviy kasblarni kichik guruhlarda, tajribali ustozlar bilan o'rgatamiz.";
-
-const CONTACT_TEXT =
-  "📍 Manzil: Xiva Shahar, Al-Xorazmiy ko'chasi, 12-uy\n" +
-  "📞 Telefon: +998 88 260 71 51\n" +
-  "🕒 Ish vaqti: Har kuni 09:00 – 18:00\n" +
-  `🌐 Sayt: ${SITE_URL}`;
+const CONTACT_TEXT = buildContactText(SITE_URL);
 
 if (!BOT_TOKEN) {
   console.warn('⚠️ TELEGRAM_BOT_TOKEN topilmadi — bot ishga tushmaydi. .env faylini tekshiring.');
@@ -34,8 +20,19 @@ if (!BOT_TOKEN) {
 
 const bot = BOT_TOKEN ? new TelegramBot(BOT_TOKEN, { polling: USE_POLLING }) : null;
 
-if (bot && USE_POLLING) {
-  console.log('🤖 Bot POLLING rejimida ishga tushdi.');
+if (bot) {
+  if (USE_POLLING) {
+    console.log('🤖 Bot POLLING rejimida ishga tushdi.');
+    // Agar avval webhook o'rnatilgan bo'lsa, uni o'chiramiz — aks holda Telegram
+    // "409 Conflict: terminated by other getUpdates request" xatoligini beradi.
+    bot.deleteWebHook().catch((err) => console.error('deleteWebHook xatolik:', err.message));
+  } else {
+    const webhookUrl = `${WEBHOOK_BASE_URL.replace(/\/$/, '')}${WEBHOOK_PATH}`;
+    bot
+      .setWebHook(webhookUrl)
+      .then(() => console.log(`🤖 Bot WEBHOOK rejimida ishga tushdi: ${webhookUrl}`))
+      .catch((err) => console.error('❌ setWebHook xatolik:', err.message));
+  }
 }
 
 const BTN_COURSES = '📚 Kurslar';
@@ -237,7 +234,11 @@ async function handleAiMessage(chatId, text) {
   const result = await askAI({
     message: text,
     history: session.history || [],
-    context: { courseNames: COURSES.map((c) => c.name) },
+    context: {
+      courses: COURSES,
+      aboutText: ABOUT_TEXT,
+      contactText: CONTACT_TEXT,
+    },
   });
 
   if (result.error) {

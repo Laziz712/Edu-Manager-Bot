@@ -4,11 +4,13 @@ const path = require('path');
 const { registerSiteUser, readUsers } = require('./users');
 const { askAI } = require('./ai');
 const { bot } = require('./bot');
+const { COURSES, ABOUT_TEXT, buildContactText } = require('./siteData');
 
 const PORT = process.env.PORT || 3000;
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 const ADMIN_KEY = process.env.ADMIN_KEY;
+const SITE_URL = process.env.SITE_URL || 'https://edu-manager-nine-theta.vercel.app';
 
 const app = express();
 
@@ -70,11 +72,22 @@ app.post('/api/notify', async (req, res) => {
   res.json({ sent });
 });
 
-// 3. AI Chat API (Gemini orqali)
+// 3. AI Chat API (Gemini orqali) — sayt/bot bilan bir xil kontekstdan foydalanadi
 app.post('/api/ai-chat', async (req, res) => {
   try {
     const { message, history, context } = req.body || {};
-    const result = await askAI({ message, history, context });
+
+    const defaultContext = {
+      courses: COURSES,
+      aboutText: ABOUT_TEXT,
+      contactText: buildContactText(SITE_URL),
+    };
+
+    const result = await askAI({
+      message,
+      history,
+      context: { ...defaultContext, ...(context || {}) },
+    });
 
     if (result.error) {
       const status = /sozlanmagan/.test(result.error) ? 503 : 502;
@@ -96,7 +109,7 @@ app.get('/api/users', (req, res) => {
   res.json(readUsers());
 });
 
-// 5. Telegram Webhook tugun-nuqtasi (Vercel / Production uchun)
+// 5. Telegram Webhook tugun-nuqtasi (Render / Production uchun)
 app.post('/api/telegram-webhook', (req, res) => {
   try {
     if (bot) {
